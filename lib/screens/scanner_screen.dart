@@ -4,13 +4,19 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:shelf_snap/services/book_search_service.dart';
 import 'package:shelf_snap/services/match_scoring_service.dart';
+import 'package:shelf_snap/services/logger_service.dart';
 import 'package:shelf_snap/models/book_result.dart';
-import 'package:shelf_snap/widgets/confidence_badge.dart';
-import 'package:shelf_snap/widgets/book_cover_placeholder.dart';
 import 'package:shelf_snap/widgets/scanner_empty_state.dart';
+import 'package:shelf_snap/widgets/scanner_sheet_header.dart';
+import 'package:shelf_snap/widgets/book_result_card.dart';
 import '../models/identified_book.dart';
 import '../services/book_identification_service.dart';
 
+/// Live camera scanner: captures a photo of a bookshelf, OCRs it, sends the
+/// text to [BookIdentificationService] to resolve individual books, then
+/// looks each one up via [BookSearchService] and ranks candidates with
+/// [MatchScoringService]. Confirmed matches accumulate in a results sheet
+/// the user can keep scanning into.
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
 
@@ -26,6 +32,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   // ─── Services ─────────────────────────────────────────
 
+  static const _logger = LoggerService('ScannerScreen');
   final _textRecognizer =
   TextRecognizer(script: TextRecognitionScript.latin);
   final _bookIdentificationService = BookIdentificationService();
@@ -38,6 +45,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
   int _captureCount = 0;
   int _activeProcessingCount = 0;
   static const int _maxConcurrentCaptures = 3;
+
+  // Top match must score at least this well to be kept; weaker matches are
+  // shown to the user as noise otherwise, since OCR text is often messy.
   static const double _strongMatchThreshold = 0.6;
 
   bool get _isProcessing => _activeProcessingCount > 0;
@@ -102,34 +112,34 @@ class _ScannerScreenState extends State<ScannerScreen> {
   // ─── Debug logging ────────────────────────────────────
 
   void _logIdentifiedBook(IdentifiedBook book, int index, int total) {
-    print('[Book $index/$total] "${book.title}" by ${book.author}');
+    _logger.debug('[Book $index/$total] "${book.title}" by ${book.author}');
   }
 
   void _logSearch(String query, List<BookResult> candidates) {
-    print('  Search: "$query"');
-    print('  Candidates: ${candidates.length}');
+    _logger.debug('  Search: "$query"');
+    _logger.debug('  Candidates: ${candidates.length}');
     for (final c in candidates.take(3)) {
-      print('    - "${c.title}" by ${c.author ?? "?"}');
+      _logger.debug('    - "${c.title}" by ${c.author ?? "?"}');
     }
   }
 
   void _logScoring(List<ScoredBookResult> scored) {
     for (final s in scored.take(3)) {
-      print('  ${s.score.toStringAsFixed(2)} | "${s.book.title}"'
+      _logger.debug('  ${s.score.toStringAsFixed(2)} | "${s.book.title}"'
           ' [${s.isConfident ? "confident" : "weak"}]');
     }
-    if (scored.isEmpty) print('  no results');
+    if (scored.isEmpty) _logger.debug('  no results');
   }
 
   void _logResult(ScoredBookResult? result, {required bool skipped, required bool discarded}) {
     if (discarded) {
-      print('  Discarded: below strong-match threshold');
+      _logger.debug('  Discarded: below strong-match threshold');
     } else if (skipped) {
-      print('  Skipped: already in list');
+      _logger.debug('  Skipped: already in list');
     } else if (result == null) {
-      print('  No match found');
+      _logger.debug('  No match found');
     } else {
-      print('  Added: "${result.book.title}"'
+      _logger.debug('  Added: "${result.book.title}"'
           ' score=${result.score.toStringAsFixed(2)}'
           ' isbn=${result.book.isbn ?? "none"}'
           ' genres=${result.book.genres.isEmpty ? "none" : result.book.genres
@@ -141,8 +151,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
   // ─── Capture + process ────────────────────────────────
 
   Future<void> _captureAndProcess() async {
+    // If camera not initialized, return
     if (_controller == null || !_controller!.value.isInitialized) return;
 
+    // If more than 3 pictures processing, show message on snackbar and return
     if (_activeProcessingCount >= _maxConcurrentCaptures) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -155,6 +167,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       return;
     }
 
+    // Increase capture count and processing count
     setState(() {
       _activeProcessingCount++;
       _captureCount++;
@@ -162,36 +175,42 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     try {
       // ── Step 1: Capture ──────────────────────────────
+      // Brief delay lets the camera settle (focus/exposure) right after
+      // the user taps, avoiding a blurry frame on fast taps.
       await Future.delayed(const Duration(milliseconds: 400));
       final XFile photo = await _controller!.takePicture();
-      print('\n--- CAPTURE #$_captureCount ---');
+      _logger.debug('\n--- CAPTURE #$_captureCount ---');
 
       // ── Step 2: OCR ──────────────────────────────────
       final inputImage = InputImage.fromFilePath(photo.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
-      print('OCR blocks (raw): ${recognizedText.blocks.length}');
+      _logger.debug('OCR blocks (raw): ${recognizedText.blocks.length}');
 
       // ── Step 3: Crop bottom 15% ───────────────────────
       // previewSize is reported in landscape on Android (width = long
       // edge), so in portrait, image height maps to previewSize.width and
       // image width maps to previewSize.height.
+
+      // We are doing this because 15% of screen is hidden by the srollable section
       final imageWidth = _controller!.value.previewSize!.height.round();
       final imageHeight = _controller!.value.previewSize!.width;
       final cutoffY = imageHeight * 0.85;
 
+      // Remove OCR blocks that were in the cut
       final filteredBlocks = recognizedText.blocks
           .where((b) => b.boundingBox.center.dy < cutoffY)
           .toList();
-      print('OCR blocks (after bottom crop): ${filteredBlocks.length}');
+      _logger.debug('OCR blocks (after bottom crop): ${filteredBlocks.length}');
 
       // ── Step 4: Identify books via Gemini ─────────────
+      // Send all the filtered blocks to Gemini, no need for clustering anymore
       final List<IdentifiedBook> identifiedBooks =
       await _bookIdentificationService.identifyBooks(
         filteredBlocks,
         imageWidth,
         imageHeight.round(),
       );
-      print('Books identified: ${identifiedBooks.length}');
+      _logger.debug('Books identified: ${identifiedBooks.length}');
 
       // ── Step 5: Search + score each identified book ──
       for (int i = 0; i < identifiedBooks.length; i++) {
@@ -230,10 +249,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
         }
       }
 
-      print('--- CAPTURE #$_captureCount END ---\n');
+      _logger.debug('--- CAPTURE #$_captureCount END ---\n');
     } catch (e, stackTrace) {
-      print('ERROR: $e');
-      print(stackTrace);
+      _logger.error('Capture/process failed', e, stackTrace);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e')),
@@ -248,120 +266,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   void _removeResult(int index) =>
       setState(() => _results.removeAt(index));
-
-  // ─── Sheet header ─────────────────────────────────────
-
-  Widget _buildSheetHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      child: Column(children: [
-        Container(
-          width: 40, height: 4,
-          decoration: BoxDecoration(
-            color: Colors.grey[600],
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '${_results.length} book${_results.length == 1 ? '' : 's'} found',
-              style: Theme
-                  .of(context)
-                  .textTheme
-                  .titleMedium,
-            ),
-            if (_captureCount > 0)
-              Text(
-                '$_captureCount photo${_captureCount == 1 ? '' : 's'} scanned',
-                style: Theme
-                    .of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(
-                    color: Colors.grey[500]),
-              ),
-          ],
-        ),
-        if (_isProcessing) ...[
-          const SizedBox(height: 6),
-          Row(children: [
-            SizedBox(
-              width: 10, height: 10,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: Theme
-                    .of(context)
-                    .colorScheme
-                    .primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              _activeProcessingCount == 1
-                  ? 'Processing 1 capture...'
-                  : 'Processing $_activeProcessingCount captures...',
-              style: TextStyle(
-                color: Theme
-                    .of(context)
-                    .colorScheme
-                    .primary,
-                fontSize: 12,
-              ),
-            ),
-          ]),
-        ],
-      ]),
-    );
-  }
-
-  // ─── Book card ────────────────────────────────────────
-
-  Widget _buildBookCard(ScoredBookResult result, int index) {
-    final book = result.book;
-    return Dismissible(
-      key: ValueKey('${book.title}_$index'),
-      direction: DismissDirection.endToStart,
-      onDismissed: (_) => _removeResult(index),
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        color: Colors.red[900],
-        child: const Icon(Icons.delete_outline, color: Colors.white),
-      ),
-      child: ListTile(
-        dense: true,
-        contentPadding:
-        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        leading: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: book.coverUrl != null
-              ? Image.network(
-            book.coverUrl!,
-            width: 36, height: 50, fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => const BookCoverPlaceholder(),
-          )
-              : const BookCoverPlaceholder(),
-        ),
-        title: Text(
-          book.title,
-          maxLines: 2, overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-        ),
-        subtitle: Text(
-          book.author ?? 'Unknown author',
-          maxLines: 1, overflow: TextOverflow.ellipsis,
-          style: TextStyle(color: Colors.grey[400], fontSize: 11),
-        ),
-        trailing: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 70),
-          child: ConfidenceBadge(score: result.score),
-        ),
-      ),
-    );
-  }
 
   // ─── Build ────────────────────────────────────────────
 
@@ -395,6 +299,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
               ),
             ),
 
+            // Bottom sheet listing books found so far. Starts mostly
+            // collapsed so it doesn't obscure the camera preview, and can
+            // be dragged up to review/remove results.
             DraggableScrollableSheet(
               initialChildSize: 0.18,
               minChildSize: 0.18,
@@ -417,7 +324,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
                     ],
                   ),
                   child: Column(children: [
-                    _buildSheetHeader(),
+                    ScannerSheetHeader(
+                      resultCount: _results.length,
+                      captureCount: _captureCount,
+                      isProcessing: _isProcessing,
+                      activeProcessingCount: _activeProcessingCount,
+                    ),
                     if (_isProcessing)
                       LinearProgressIndicator(
                         backgroundColor: Colors.grey[800],
@@ -437,8 +349,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
                         itemCount: _results.length,
                         separatorBuilder: (_, __) =>
                         const Divider(height: 1),
-                        itemBuilder: (context, index) =>
-                            _buildBookCard(_results[index], index),
+                        itemBuilder: (context, index) => BookResultCard(
+                          result: _results[index],
+                          index: index,
+                          onDismissed: () => _removeResult(index),
+                        ),
                       ),
                     ),
                   ]),

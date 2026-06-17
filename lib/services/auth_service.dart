@@ -15,6 +15,7 @@ class AuthService {
       UserCredential userCredential = await _auth
           .createUserWithEmailAndPassword(email: email, password: password);
       return userCredential.user;
+      // ignore: unused_catch_clause
     } on FirebaseAuthException catch (e) {
       // Rethrow so the UI layer (signup screen) can catch it and show a message
       rethrow;
@@ -29,6 +30,7 @@ class AuthService {
         password: password,
       );
       return userCredential.user;
+      // ignore: unused_catch_clause
     } on FirebaseAuthException catch (e) {
       rethrow;
     }

@@ -1,16 +1,14 @@
 /// A book identified by the Gemini-backed identifyBooks Cloud Function
-/// from a group of OCR text fragments. Replaces DetectedSpine as the unit
-/// passed into BookSearchService — Gemini has already done the
-/// fragment-grouping and garbled-text reconstruction that
-/// SpineDetectionService used to attempt geometrically.
+/// from a group of OCR text fragments. Gemini has already done the
+/// fragment-grouping and garbled-text reconstruction that would otherwise
+/// have to be attempted geometrically from raw bounding boxes.
 class IdentifiedBook {
   final String title;
   final String author;
 
   const IdentifiedBook({required this.title, required this.author});
 
-  /// Combined query string for BookSearchService — same shape as the
-  /// fullText DetectedSpine used to provide.
+  /// Combined query string passed to [BookSearchService].
   String get searchQuery => author.isEmpty ? title : '$title $author';
 
   @override
