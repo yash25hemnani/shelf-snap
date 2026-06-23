@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
@@ -14,7 +15,7 @@ class BookIdentificationService {
   // Swap for your deployed URL once hosted publicly. For local testing
   // against a real device over USB, use `adb reverse tcp:3000 tcp:3000`
   // and keep this as localhost — see note below.
-  static const String _baseUrl = 'http://localhost:3000';
+  static const String _baseUrl = 'https://shelf-snap-gemini-wrapper-sand.vercel.app/';
 
   static String get _sharedSecret =>
       dotenv.env['IDENTIFY_BOOKS_SHARED_SECRET'] ?? '';
@@ -30,6 +31,13 @@ class BookIdentificationService {
     int imageHeight,
   ) async {
     if (blocks.isEmpty) return [];
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _logger.warning('No signed-in Firebase user — skipping identify-books');
+      return [];
+    }
+    final idToken = await user.getIdToken();
+
 
     final payload = {
       'imageWidth': imageWidth,
@@ -53,11 +61,11 @@ class BookIdentificationService {
             Uri.parse('$_baseUrl/identify-books'),
             headers: {
               'Content-Type': 'application/json',
-              'x-app-secret': _sharedSecret,
+              'Authorization': 'Bearer $idToken',
             },
             body: jsonEncode(payload),
           )
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 60));
 
       if (response.statusCode != 200) {
         _logger.warning('HTTP ${response.statusCode} — ${response.body}');
@@ -65,6 +73,7 @@ class BookIdentificationService {
       }
 
       final decoded = jsonDecode(response.body);
+      print(decoded);
       final List<dynamic> booksJson =
           (decoded is Map && decoded['books'] is List)
           ? decoded['books'] as List<dynamic>

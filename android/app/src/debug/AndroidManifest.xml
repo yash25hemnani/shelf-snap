@@ -4,4 +4,8 @@
          to allow setting breakpoints, to provide hot reload, etc.
     -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Allows plain HTTP to localhost/10.0.2.2 so debug builds can reach
+         the local Gemini backend (see network_security_config.xml). -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
 </manifest>

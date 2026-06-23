@@ -33,7 +33,7 @@ class BookSearchService {
     if (words.isEmpty) return [];
 
     // Try the full query first, then progressively shorter prefixes.
-    // e.g. for ["THE", "ELEPHANT", "VANTSHES"]:
+    // e.g. for ["THE", "ELEPHANT", "VANTaSHES"]:
     //   1. "THE ELEPHANT VANTSHES"
     //   2. "THE ELEPHANT"
     //   3. "THE"

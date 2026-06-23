@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 
-/// Header for the draggable results sheet on [ScannerScreen]: the drag
-/// handle, a result/capture count summary, and an inline "processing"
-/// spinner while a capture is still being analyzed.
 class ScannerSheetHeader extends StatelessWidget {
   final int resultCount;
   final int captureCount;
@@ -19,57 +16,75 @@ class ScannerSheetHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final isDone = captureCount > 0 && !isProcessing;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-      child: Column(children: [
-        // Drag handle hinting the sheet can be pulled up.
-        Container(
-          width: 40, height: 4,
-          decoration: BoxDecoration(
-            color: Colors.grey[600],
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '$resultCount book${resultCount == 1 ? '' : 's'} found',
-              style: Theme.of(context).textTheme.titleMedium,
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 32,
+              height: 3,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-            if (captureCount > 0)
-              Text(
-                '$captureCount photo${captureCount == 1 ? '' : 's'} scanned',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[500],
+          ),
+          const SizedBox(height: 14),
+
+          // Title row
+          Row(
+            children: [
+              Expanded(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        '$resultCount ${resultCount == 1 ? 'book' : 'books'} found',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w500,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    if (isProcessing)
+                      SizedBox(
+                        width: 13,
+                        height: 13,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: primary,
+                        ),
+                      )
+                    else if (isDone)
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 18,
+                        color: theme.colorScheme.tertiary,
+                      ),
+                  ],
                 ),
               ),
-          ],
-        ),
-        if (isProcessing) ...[
-          const SizedBox(height: 6),
-          Row(children: [
-            SizedBox(
-              width: 10, height: 10,
-              child: CircularProgressIndicator(
-                strokeWidth: 1.5,
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              activeProcessingCount == 1
-                  ? 'Processing 1 capture...'
-                  : 'Processing $activeProcessingCount captures...',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.primary,
-                fontSize: 12,
-              ),
-            ),
-          ]),
+              if (captureCount > 0)
+                Text(
+                  '$captureCount ${captureCount == 1 ? 'photo' : 'photos'} scanned',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+            ],
+          ),
         ],
-      ]),
+      ),
     );
   }
 }

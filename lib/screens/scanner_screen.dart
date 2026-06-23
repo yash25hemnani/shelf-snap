@@ -6,6 +6,8 @@ import 'package:shelf_snap/services/book_search_service.dart';
 import 'package:shelf_snap/services/match_scoring_service.dart';
 import 'package:shelf_snap/services/logger_service.dart';
 import 'package:shelf_snap/models/book_result.dart';
+import 'package:shelf_snap/widgets/genre_alert_sheet.dart';
+import 'package:shelf_snap/widgets/genre_selector.dart';
 import 'package:shelf_snap/widgets/scanner_empty_state.dart';
 import 'package:shelf_snap/widgets/scanner_sheet_header.dart';
 import 'package:shelf_snap/widgets/book_result_card.dart';
@@ -30,11 +32,37 @@ class _ScannerScreenState extends State<ScannerScreen> {
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
 
+  // ─── Genre alerts ─────────────────────────────────────
+
+  Set<String> _watchedGenres = {};
+  void _openGenreAlerts() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return GenreAlertSheet(
+            watchedGenres: _watchedGenres,
+            onChanged: (updated) {
+              setState(() => _watchedGenres = updated);
+              setModalState(() {});
+            },
+            onClearAll: () {
+              setState(() => _watchedGenres = {});
+              setModalState(() {});
+            },
+          );
+        },
+      ),
+    );
+  }
   // ─── Services ─────────────────────────────────────────
 
   static const _logger = LoggerService('ScannerScreen');
-  final _textRecognizer =
-  TextRecognizer(script: TextRecognitionScript.latin);
+  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   final _bookIdentificationService = BookIdentificationService();
   final _bookSearchService = BookSearchService();
   final _matchScoringService = MatchScoringService();
@@ -66,19 +94,19 @@ class _ScannerScreenState extends State<ScannerScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Flash mode not supported on this device')),
+            content: Text('Flash mode not supported on this device'),
+          ),
         );
       }
     }
   }
 
-  IconData get _flashIcon =>
-      switch (_flashMode) {
-        FlashMode.off => Icons.flash_off,
-        FlashMode.auto => Icons.flash_auto,
-        FlashMode.torch => Icons.flashlight_on,
-        _ => Icons.flash_off,
-      };
+  IconData get _flashIcon => switch (_flashMode) {
+    FlashMode.off => Icons.flash_off,
+    FlashMode.auto => Icons.flash_auto,
+    FlashMode.torch => Icons.flashlight_on,
+    _ => Icons.flash_off,
+  };
 
   // ─── Lifecycle ────────────────────────────────────────
 
@@ -103,7 +131,8 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
     final cameras = await availableCameras();
     final backCamera = cameras.firstWhere(
-            (c) => c.lensDirection == CameraLensDirection.back);
+      (c) => c.lensDirection == CameraLensDirection.back,
+    );
 
     _controller = CameraController(backCamera, ResolutionPreset.high);
     await _controller!.initialize();
@@ -125,13 +154,19 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   void _logScoring(List<ScoredBookResult> scored) {
     for (final s in scored.take(3)) {
-      _logger.debug('  ${s.score.toStringAsFixed(2)} | "${s.book.title}"'
-          ' [${s.isConfident ? "confident" : "weak"}]');
+      _logger.debug(
+        '  ${s.score.toStringAsFixed(2)} | "${s.book.title}"'
+        ' [${s.isConfident ? "confident" : "weak"}]',
+      );
     }
     if (scored.isEmpty) _logger.debug('  no results');
   }
 
-  void _logResult(ScoredBookResult? result, {required bool skipped, required bool discarded}) {
+  void _logResult(
+    ScoredBookResult? result, {
+    required bool skipped,
+    required bool discarded,
+  }) {
     if (discarded) {
       _logger.debug('  Discarded: below strong-match threshold');
     } else if (skipped) {
@@ -139,12 +174,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
     } else if (result == null) {
       _logger.debug('  No match found');
     } else {
-      _logger.debug('  Added: "${result.book.title}"'
-          ' score=${result.score.toStringAsFixed(2)}'
-          ' isbn=${result.book.isbn ?? "none"}'
-          ' genres=${result.book.genres.isEmpty ? "none" : result.book.genres
-          .join(", ")}'
-          ' cover=${result.book.coverUrl != null ? "yes" : "no"}');
+      _logger.debug(
+        '  Added: "${result.book.title}"'
+        ' score=${result.score.toStringAsFixed(2)}'
+        ' isbn=${result.book.isbn ?? "none"}'
+        ' genres=${result.book.genres.isEmpty ? "none" : result.book.genres.join(", ")}'
+        ' cover=${result.book.coverUrl != null ? "yes" : "no"}',
+      );
     }
   }
 
@@ -205,11 +241,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
       // ── Step 4: Identify books via Gemini ─────────────
       // Send all the filtered blocks to Gemini, no need for clustering anymore
       final List<IdentifiedBook> identifiedBooks =
-      await _bookIdentificationService.identifyBooks(
-        filteredBlocks,
-        imageWidth,
-        imageHeight.round(),
-      );
+          await _bookIdentificationService.identifyBooks(
+            filteredBlocks,
+            imageWidth,
+            imageHeight.round(),
+          );
       _logger.debug('Books identified: ${identifiedBooks.length}');
 
       // ── Step 5: Search + score each identified book ──
@@ -217,12 +253,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
         final book = identifiedBooks[i];
         _logIdentifiedBook(book, i + 1, identifiedBooks.length);
 
-        final List<BookResult> candidates =
-        await _bookSearchService.search(book.searchQuery);
+        final List<BookResult> candidates = await _bookSearchService.search(
+          book.searchQuery,
+        );
         _logSearch(book.searchQuery, candidates);
 
-        final List<ScoredBookResult> scoredResults =
-        _matchScoringService.scoreAndRank(book.searchQuery, candidates);
+        final List<ScoredBookResult> scoredResults = _matchScoringService
+            .scoreAndRank(book.searchQuery, candidates);
         _logScoring(scoredResults);
 
         if (scoredResults.isNotEmpty && mounted) {
@@ -232,9 +269,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
             _logResult(null, skipped: false, discarded: true);
           } else {
             setState(() {
-              final alreadyAdded = _results.any((r) =>
-              r.book.title.toLowerCase() ==
-                  topMatch.book.title.toLowerCase());
+              final alreadyAdded = _results.any(
+                (r) =>
+                    r.book.title.toLowerCase() ==
+                    topMatch.book.title.toLowerCase(),
+              );
 
               if (!alreadyAdded) {
                 _results.add(topMatch);
@@ -253,9 +292,9 @@ class _ScannerScreenState extends State<ScannerScreen> {
     } catch (e, stackTrace) {
       _logger.error('Capture/process failed', e, stackTrace);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     } finally {
       if (mounted) setState(() => _activeProcessingCount--);
@@ -264,8 +303,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   // ─── Remove a result ──────────────────────────────────
 
-  void _removeResult(int index) =>
-      setState(() => _results.removeAt(index));
+  void _removeResult(int index) => setState(() => _results.removeAt(index));
 
   // ─── Build ────────────────────────────────────────────
 
@@ -284,96 +322,143 @@ class _ScannerScreenState extends State<ScannerScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
-          return Stack(children: [
-            Positioned.fill(child: CameraPreview(_controller!)),
+          return Stack(
+            children: [
+              Positioned.fill(child: CameraPreview(_controller!)),
 
-            Positioned(
-              top: 48, right: 16,
-              child: IconButton.filled(
-                onPressed: _cycleFlashMode,
-                icon: Icon(_flashIcon),
-                style: IconButton.styleFrom(
-                  backgroundColor: Colors.black45,
-                  foregroundColor: Colors.white,
+              Positioned(
+                top: 48,
+                left: 16,
+                child: IconButton.filled(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: BackButtonIcon(),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black45,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
-            ),
 
-            // Bottom sheet listing books found so far. Starts mostly
-            // collapsed so it doesn't obscure the camera preview, and can
-            // be dragged up to review/remove results.
-            DraggableScrollableSheet(
-              initialChildSize: 0.18,
-              minChildSize: 0.18,
-              maxChildSize: 0.85,
-              builder: (context, scrollController) {
-                return Container(
-                  decoration: BoxDecoration(
-                    color: Theme
-                        .of(context)
-                        .colorScheme
-                        .surface,
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(0, -4),
-                      ),
-                    ],
-                  ),
-                  child: Column(children: [
-                    ScannerSheetHeader(
-                      resultCount: _results.length,
-                      captureCount: _captureCount,
-                      isProcessing: _isProcessing,
-                      activeProcessingCount: _activeProcessingCount,
-                    ),
-                    if (_isProcessing)
-                      LinearProgressIndicator(
-                        backgroundColor: Colors.grey[800],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          Theme
-                              .of(context)
-                              .colorScheme
-                              .primary,
-                        ),
-                      ),
-                    const Divider(height: 1),
-                    Expanded(
-                      child: _results.isEmpty
-                          ? const ScannerEmptyState()
-                          : ListView.separated(
-                        controller: scrollController,
-                        itemCount: _results.length,
-                        separatorBuilder: (_, __) =>
-                        const Divider(height: 1),
-                        itemBuilder: (context, index) => BookResultCard(
-                          result: _results[index],
-                          index: index,
-                          onDismissed: () => _removeResult(index),
-                        ),
+              Positioned(
+                top: 48,
+                right: 16,
+                child: Column(
+                  children: [
+                    IconButton.filled(
+                      onPressed: _cycleFlashMode,
+                      icon: Icon(_flashIcon),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black45,
+                        foregroundColor: Colors.white,
                       ),
                     ),
-                  ]),
-                );
-              },
-            ),
-
-            Positioned(
-              bottom: 120, right: 16,
-              child: FloatingActionButton.large(
-                onPressed: _captureAndProcess,
-                backgroundColor:
-                Theme
-                    .of(context)
-                    .colorScheme
-                    .primary,
-                child: const Icon(Icons.camera_alt, size: 32),
+                    const SizedBox(height: 2),
+                    IconButton.filled(
+                      onPressed: _openGenreAlerts,
+                      icon: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(Icons.notifications_outlined),
+                          if (_watchedGenres.isNotEmpty)
+                            Positioned(
+                              top: -2,
+                              right: -2,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.black45,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ]);
+
+              // Bottom sheet listing books found so far. Starts mostly
+              // collapsed so it doesn't obscure the camera preview, and can
+              // be dragged up to review/remove results.
+              DraggableScrollableSheet(
+                initialChildSize: 0.18,
+                minChildSize: 0.18,
+                maxChildSize: 0.85,
+                builder: (context, scrollController) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(20),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.4),
+                          blurRadius: 12,
+                          offset: const Offset(0, -4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        ScannerSheetHeader(
+                          resultCount: _results.length,
+                          captureCount: _captureCount,
+                          isProcessing: _isProcessing,
+                          activeProcessingCount: _activeProcessingCount,
+                        ),
+                        if (_isProcessing)
+                          LinearProgressIndicator(
+                            backgroundColor: Colors.grey[800],
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Theme.of(context).colorScheme.primary,
+                            ),
+                          ),
+                        const Divider(height: 1),
+                        Expanded(
+                          child: _results.isEmpty
+                              ? const ScannerEmptyState()
+                              : ListView.separated(
+                                  controller: scrollController,
+                                  itemCount: _results.length,
+                                  separatorBuilder: (_, __) =>
+                                      const Divider(height: 1),
+                                  itemBuilder: (context, index) =>
+                                      BookResultCard(
+                                        result: _results[index],
+                                        index: index,
+                                        onDismissed: () => _removeResult(index),
+                                      ),
+                                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              Positioned(
+                bottom: MediaQuery.of(context).size.height * 0.18 - 20,
+                right: 16,
+                child: SizedBox(
+                  width: 68,
+                  height: 68,
+                  child: FloatingActionButton(
+                    onPressed: _captureAndProcess,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    shape: const CircleBorder(),
+                    child: const Icon(Icons.camera_alt, size: 32),
+                  ),
+                ),
+              ),
+            ],
+          );
         },
       ),
     );
