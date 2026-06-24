@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only override: allows plain HTTP to localhost so the app can reach
+  the local Gemini backend over `adb reverse tcp:3000 tcp:3000` during
+  development. Android blocks cleartext traffic by default since API 28.
+  This file only applies to debug builds (src/debug), so release builds
+  keep the default HTTPS-only policy.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

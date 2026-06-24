@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import '../models/identified_book.dart';
@@ -16,9 +15,6 @@ class BookIdentificationService {
   // against a real device over USB, use `adb reverse tcp:3000 tcp:3000`
   // and keep this as localhost — see note below.
   static const String _baseUrl = 'https://shelf-snap-gemini-wrapper-sand.vercel.app/';
-
-  static String get _sharedSecret =>
-      dotenv.env['IDENTIFY_BOOKS_SHARED_SECRET'] ?? '';
 
   /// Groups [blocks] of raw OCR text into distinct books and resolves
   /// likely real titles/authors for each. [imageWidth]/[imageHeight] give
@@ -37,7 +33,6 @@ class BookIdentificationService {
       return [];
     }
     final idToken = await user.getIdToken();
-
 
     final payload = {
       'imageWidth': imageWidth,
@@ -73,7 +68,7 @@ class BookIdentificationService {
       }
 
       final decoded = jsonDecode(response.body);
-      print(decoded);
+      _logger.debug('identify-books response: $decoded');
       final List<dynamic> booksJson =
           (decoded is Map && decoded['books'] is List)
           ? decoded['books'] as List<dynamic>

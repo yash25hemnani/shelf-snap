@@ -29,12 +29,6 @@ class MatchScoringService {
     return deduplicated;
   }
 
-  /// Whether the top match is confident enough to show as the primary result,
-  /// or whether we should immediately prompt the user to pick from alternatives.
-  bool isConfidentMatch(ScoredBookResult result) {
-    return result.score >= _confidentMatchThreshold;
-  }
-
   /// Normalizes text before comparison:
   /// lowercase, trim whitespace, remove punctuation.
   /// This prevents "The Elephant Vanishes" vs "THE ELEPHANT VANISHES"

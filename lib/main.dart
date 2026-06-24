@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'firebase_options.dart';
 import 'screens/auth_gate.dart';
 
@@ -12,10 +13,8 @@ Future<void> main() async {
   // Firebase.initializeApp() connects your app to your Firebase project (the one you created with flutterfire configure).
   // DefaultFirebaseOptions.currentPlatform automatically picks the right config — Android config when running on Android,
   // iOS config on iOS, etc. — from the generated firebase_options.dart
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-  runApp(const MyApp());
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  runApp(ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {

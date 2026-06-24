@@ -6,40 +6,42 @@ import 'package:http/http.dart' as http;
 import '../models/book_result.dart';
 
 /// Searches Google Books for metadata (title, author, ISBN, cover) matching
-/// OCR'd spine text.
+/// a book title/author already resolved by Gemini (see
+/// [BookIdentificationService]) — not raw OCR text.
 ///
-/// Since OCR text is often imperfect (typos, garbled trailing words), this
-/// service uses a "retry ladder": if the full query returns no results, it
-/// progressively drops trailing words and retries, since the most reliable
-/// part of a spine's text is usually the first few words of the title.
+/// Gemini's resolved title is usually accurate, but it doesn't always match
+/// Google Books' exact listing (subtitles, alternate editions, etc.), so
+/// this service uses a "retry ladder": if the full query returns no results,
+/// it progressively drops trailing words and retries, since the title at
+/// the front of the query is the most reliable part.
 class BookSearchService {
   static String get _apiKey => dotenv.env['GOOGLE_BOOKS_API_KEY'] ?? '';
 
   static const String _baseUrl = 'https://www.googleapis.com/books/v1/volumes';
 
-  /// Searches for a book matching [ocrText], trying progressively shorter
-  /// queries (dropping trailing words) until results are found or all
-  /// variants are exhausted.
+  /// Searches for a book matching [query] (title, or "title author"),
+  /// trying progressively shorter prefixes (dropping trailing words) until
+  /// results are found or all variants are exhausted.
   ///
   /// Returns an empty list if no variant returns results.
-  Future<List<BookResult>> search(String ocrText) async {
-    final cleanedText = _cleanOcrText(ocrText);
-    // Split into words, removing empty strings (e.g. from double spaces).
-    final words = cleanedText
-        .split(' ')
-        .where((w) => w.trim().isNotEmpty)
+  Future<List<BookResult>> search(String query) async {
+    final words = query
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty)
         .toList();
 
     if (words.isEmpty) return [];
 
     // Try the full query first, then progressively shorter prefixes.
-    // e.g. for ["THE", "ELEPHANT", "VANTaSHES"]:
-    //   1. "THE ELEPHANT VANTSHES"
-    //   2. "THE ELEPHANT"
-    //   3. "THE"
+    // e.g. for ["The", "Elephant", "Vanishes", "Murakami"]:
+    //   1. "The Elephant Vanishes Murakami"
+    //   2. "The Elephant Vanishes"
+    //   3. "The Elephant"
+    //   4. "The"
     for (int len = words.length; len >= 1; len--) {
-      final query = words.sublist(0, len).join(' ');
-      final results = await _querySingle(query);
+      final candidateQuery = words.sublist(0, len).join(' ');
+      final results = await _querySingle(candidateQuery);
 
       if (results.isNotEmpty) {
         return results;
@@ -112,37 +114,9 @@ class BookSearchService {
       isbn: isbn,
       coverUrl: coverUrl,
       genres: genres,
+      // This is a search candidate, not yet saved to a library — addedAt
+      // gets a real value if/when the user actually adds it to one.
+      addedAt: DateTime.now(),
     );
   }
-}
-
-final _knownPublishers = [
-  'ROUTLEDGE', 'ROUTLEDCA', 'PENGUIN', 'VIKING', 'HARPER', 'COLLINS',
-  'OXFORD', 'CAMBRIDGE', 'SPRINGER', 'WILEY', 'NORTON', 'RANDOM HOUSE',
-  'MACMILLAN', 'BLOOMSBURY', 'PICADOR', 'VINTAGE', 'ANCHOR', 'KNOPF',
-  'SIMON SCHUSTER', 'HACHETTE', 'SCHOLASTIC', 'PEARSON',
-];
-
-String _cleanOcrText(String text) {
-  String cleaned = text.toUpperCase();
-
-  // Strip known publisher names
-  for (final publisher in _knownPublishers) {
-    cleaned = cleaned.replaceAll(publisher, '');
-  }
-
-  // Replace digits embedded in words
-  cleaned = cleaned.replaceAllMapped(
-    RegExp(r'(?<=[a-zA-Z])\d|\d(?=[a-zA-Z])'),
-        (match) => switch (match.group(0)) {
-      '0' => 'O',
-      '1' => 'I',
-      '5' => 'S',
-      '8' => 'B',
-      _ => match.group(0)!,
-    },
-  );
-
-  // Collapse multiple spaces left by removals
-  return cleaned.replaceAll(RegExp(r'\s+'), ' ').trim();
 }

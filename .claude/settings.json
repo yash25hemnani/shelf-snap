@@ -7,7 +7,8 @@
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; grep -n \"uses-permission\\\\|usesCleartextTraffic\\\\|network_security\" {}')",
       "Bash(cd \"c:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\" && mkdir -p android/app/src/debug/res/xml)",
       "Bash(flutter build *)",
-      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; grep -n \"networkSecurityConfig\" {}')"
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; grep -n \"networkSecurityConfig\" {}')",
+      "Bash(git rm *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res"

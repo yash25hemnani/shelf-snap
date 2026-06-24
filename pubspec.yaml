@@ -45,6 +45,7 @@ dependencies:
   # Utilities (optional but useful)
   permission_handler: ^11.3.1   # for camera permissions
   string_similarity: ^2.2.0
+  flutter_riverpod: ^2.6.1
 
 
   # The following adds the Cupertino Icons font to your application.

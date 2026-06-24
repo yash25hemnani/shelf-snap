@@ -7,7 +7,6 @@ import 'package:shelf_snap/services/match_scoring_service.dart';
 import 'package:shelf_snap/services/logger_service.dart';
 import 'package:shelf_snap/models/book_result.dart';
 import 'package:shelf_snap/widgets/genre_alert_sheet.dart';
-import 'package:shelf_snap/widgets/genre_selector.dart';
 import 'package:shelf_snap/widgets/scanner_empty_state.dart';
 import 'package:shelf_snap/widgets/scanner_sheet_header.dart';
 import 'package:shelf_snap/widgets/book_result_card.dart';
@@ -35,6 +34,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
   // ─── Genre alerts ─────────────────────────────────────
 
   Set<String> _watchedGenres = {};
+
   void _openGenreAlerts() {
     showModalBottomSheet(
       context: context,
@@ -59,6 +59,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
       ),
     );
   }
+
   // ─── Services ─────────────────────────────────────────
 
   static const _logger = LoggerService('ScannerScreen');
