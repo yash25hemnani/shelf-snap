@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shelf_snap/services/match_scoring_service.dart';
-import 'package:shelf_snap/widgets/book_cover_placeholder.dart';
-import 'package:shelf_snap/widgets/confidence_badge.dart';
+import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
+import 'package:shelf_snap/features/scanner/widgets/book_cover_placeholder.dart';
+import 'package:shelf_snap/features/scanner/widgets/confidence_badge.dart';
 
 /// A single scanned book in the results list. Swipe left to remove it
 /// (calls [onDismissed]) — used by [ScannerScreen]'s results sheet.

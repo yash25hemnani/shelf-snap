@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import '../models/book_result.dart';
+import 'package:shelf_snap/core/models/book_result.dart';
 
 /// Searches Google Books for metadata (title, author, ISBN, cover) matching
 /// a book title/author already resolved by Gemini (see
@@ -21,7 +21,7 @@ class BookSearchService {
 
   /// Searches for a book matching [query] (title, or "title author"),
   /// trying progressively shorter prefixes (dropping trailing words) until
-  /// results are found or all variants are exhausted.
+  /// results are found or all  variants are exhausted.
   ///
   /// Returns an empty list if no variant returns results.
   Future<List<BookResult>> search(String query) async {

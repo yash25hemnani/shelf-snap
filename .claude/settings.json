@@ -8,7 +8,13 @@
       "Bash(cd \"c:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\" && mkdir -p android/app/src/debug/res/xml)",
       "Bash(flutter build *)",
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; grep -n \"networkSecurityConfig\" {}')",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST \"https://shelf-snap-gemini-wrapper-sand.vercel.app//identify-books\" -H \"Content-Type: application/json\" -d '{}' --max-time 15)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST \"https://shelf-snap-gemini-wrapper-sand.vercel.app/identify-books\" -H \"Content-Type: application/json\" -d '{}' --max-time 15)",
+      "Bash(flutter run *)",
+      "Bash(cd \"c:/Users/it/StudioProjects/shelf_snap\" && cat -A /dev/null; sed -n '1,36p' \"C:\\\\Users\\\\it\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-it-StudioProjects-shelf-snap\\\\26bfcf45-8fbb-4c99-be07-afe710d8f758\\\\tasks\\\\bskk1qklg.output\")",
+      "Read(//dev/**)",
+      "Bash(dart format *)"
     ],
     "additionalDirectories": [
       "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res"

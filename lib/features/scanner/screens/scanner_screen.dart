@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:shelf_snap/services/book_search_service.dart';
-import 'package:shelf_snap/services/match_scoring_service.dart';
-import 'package:shelf_snap/services/logger_service.dart';
-import 'package:shelf_snap/models/book_result.dart';
-import 'package:shelf_snap/widgets/genre_alert_sheet.dart';
-import 'package:shelf_snap/widgets/scanner_empty_state.dart';
-import 'package:shelf_snap/widgets/scanner_sheet_header.dart';
-import 'package:shelf_snap/widgets/book_result_card.dart';
-import '../models/identified_book.dart';
-import '../services/book_identification_service.dart';
+import 'package:shelf_snap/features/scanner/services/book_search_service.dart';
+import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
+import 'package:shelf_snap/core/services/logger_service.dart';
+import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/features/scanner/widgets/genre_alert_sheet.dart';
+import 'package:shelf_snap/features/library/widgets/library_picker_sheet.dart';
+import 'package:shelf_snap/features/scanner/widgets/scanner_empty_state.dart';
+import 'package:shelf_snap/features/scanner/widgets/scanner_sheet_header.dart';
+import 'package:shelf_snap/features/scanner/widgets/book_result_card.dart';
+import 'package:shelf_snap/features/scanner/models/identified_book.dart';
+import 'package:shelf_snap/features/scanner/services/book_identification_service.dart';
 
 /// Live camera scanner: captures a photo of a bookshelf, OCRs it, sends the
 /// text to [BookIdentificationService] to resolve individual books, then
@@ -232,6 +234,16 @@ class _ScannerScreenState extends State<ScannerScreen> {
       final imageWidth = _controller!.value.previewSize!.height.round();
       final imageHeight = _controller!.value.previewSize!.width;
       final cutoffY = imageHeight * 0.85;
+      final maxBlockBottom = recognizedText.blocks.isEmpty
+          ? 0
+          : recognizedText.blocks
+                .map((b) => b.boundingBox.bottom)
+                .reduce((a, b) => a > b ? a : b);
+      _logger.debug(
+        'previewSize=${_controller!.value.previewSize}'
+        ' imageWidth=$imageWidth imageHeight=$imageHeight'
+        ' cutoffY=$cutoffY maxBlockBottom=$maxBlockBottom',
+      );
 
       // Remove OCR blocks that were in the cut
       final filteredBlocks = recognizedText.blocks
@@ -306,6 +318,38 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   void _removeResult(int index) => setState(() => _results.removeAt(index));
 
+  // ─── Back navigation ──────────────────────────────────
+
+  Future<void> _confirmBack(BuildContext context) async {
+    if (_results.isEmpty) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    final result = await showModalBottomSheet<LibraryPickerResult>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => LibraryPickerSheet(userId: userId, results: _results),
+    );
+
+    if (!context.mounted) return;
+
+    // Sheet dismissed without choosing (tap outside / swipe down) means the
+    // user wants to keep scanning, so stay on this screen.
+    if (result != null) {
+      Navigator.of(context).pop();
+    }
+  }
+
   // ─── Build ────────────────────────────────────────────
 
   @override
@@ -331,7 +375,7 @@ class _ScannerScreenState extends State<ScannerScreen> {
                 top: 48,
                 left: 16,
                 child: IconButton.filled(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => _confirmBack(context),
                   icon: BackButtonIcon(),
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.black45,

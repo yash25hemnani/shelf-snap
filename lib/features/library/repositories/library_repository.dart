@@ -1,16 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shelf_snap/models/book_result.dart';
-import 'package:shelf_snap/models/library_model.dart';
+import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/features/library/models/library_model.dart';
 
 class LibraryRepository {
   final _db = FirebaseFirestore.instance;
 
-  // Create a library
-  Future<void> createLibrary(LibraryModel library) async {
+  // Create a library, returning its generated id
+  Future<String> createLibrary(LibraryModel library) async {
     final data = library.toMap();
     // Ensure owner in members
     data["members"] = {...library.members, library.ownerId}.toList();
-    await _db.collection("libraries").add(library.toMap());
+    final doc = await _db.collection("libraries").add(data);
+    return doc.id;
   }
 
   // Stream and watch all libraries for a user

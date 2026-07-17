@@ -2,8 +2,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'firebase_options.dart';
-import 'screens/auth_gate.dart';
+import 'package:shelf_snap/firebase_options.dart';
+import 'package:shelf_snap/features/auth/screens/auth_gate.dart';
 
 Future<void> main() async {
   // Flutter needs its internal "engine binding" set up before any platform-specific code (like Firebase, which talks to native Android/iOS code) can run.

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf_snap/models/book_result.dart';
-import 'package:shelf_snap/models/library_model.dart';
-import 'package:shelf_snap/providers/library_provider.dart';
-import 'package:shelf_snap/services/match_scoring_service.dart';
+import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/features/library/models/library_model.dart';
+import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
 
 enum LibraryPickerResult { saved, discarded }
 

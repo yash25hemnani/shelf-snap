@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import '../models/identified_book.dart';
-import 'logger_service.dart';
+import 'package:shelf_snap/features/scanner/models/identified_book.dart';
+import 'package:shelf_snap/core/services/logger_service.dart';
 
 /// Sends on-device OCR output to a self-hosted Node.js API (Gemini-backed),
 /// which groups fragmented/garbled text blocks into individual books and
@@ -11,10 +11,7 @@ import 'logger_service.dart';
 class BookIdentificationService {
   static const _logger = LoggerService('BookIdentificationService');
 
-  // Swap for your deployed URL once hosted publicly. For local testing
-  // against a real device over USB, use `adb reverse tcp:3000 tcp:3000`
-  // and keep this as localhost — see note below.
-  static const String _baseUrl = 'https://shelf-snap-gemini-wrapper-sand.vercel.app/';
+  static const String _baseUrl = 'https://shelf-snap-gemini-wrapper-sand.vercel.app';
 
   /// Groups [blocks] of raw OCR text into distinct books and resolves
   /// likely real titles/authors for each. [imageWidth]/[imageHeight] give
@@ -26,7 +23,10 @@ class BookIdentificationService {
     int imageWidth,
     int imageHeight,
   ) async {
-    if (blocks.isEmpty) return [];
+    if (blocks.isEmpty) {
+      _logger.debug('No OCR blocks passed in — skipping identify-books call');
+      return [];
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       _logger.warning('No signed-in Firebase user — skipping identify-books');

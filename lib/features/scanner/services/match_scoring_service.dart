@@ -1,5 +1,5 @@
 import 'package:string_similarity/string_similarity.dart';
-import '../models/book_result.dart';
+import 'package:shelf_snap/core/models/book_result.dart';
 
 class MatchScoringService {
   /// Minimum similarity score to consider a result a "confident" match.

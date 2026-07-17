@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shelf_snap/widgets/genre_selector.dart';
+import 'package:shelf_snap/features/scanner/widgets/genre_selector.dart';
 
 class GenreAlertSheet extends StatelessWidget {
   final Set<String> watchedGenres;

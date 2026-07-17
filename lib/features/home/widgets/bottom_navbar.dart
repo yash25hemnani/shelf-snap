@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shelf_snap/models/nav_item_model.dart';
+import 'package:shelf_snap/features/home/models/nav_item_model.dart';
 
 class BottomNavbar extends StatelessWidget {
   final int selectedIndex;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shelf_snap/models/nav_item_model.dart';
-import 'package:shelf_snap/screens/scanner_screen.dart';
-import 'package:shelf_snap/widgets/bottom_navbar.dart';
+import 'package:shelf_snap/features/home/models/nav_item_model.dart';
+import 'package:shelf_snap/features/scanner/screens/scanner_screen.dart';
+import 'package:shelf_snap/features/home/widgets/bottom_navbar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

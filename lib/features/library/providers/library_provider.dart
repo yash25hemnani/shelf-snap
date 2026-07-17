@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../repositories/library_repository.dart';
-import '../models/library_model.dart';
-import '../models/book_result.dart';
+import 'package:shelf_snap/features/library/repositories/library_repository.dart';
+import 'package:shelf_snap/features/library/models/library_model.dart';
+import 'package:shelf_snap/core/models/book_result.dart';
 
 final libraryRepositoryProvider = Provider((ref) => LibraryRepository());
 
