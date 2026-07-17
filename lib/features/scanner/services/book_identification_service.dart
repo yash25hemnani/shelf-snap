@@ -2,15 +2,12 @@ import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:shelf_snap/features/scanner/models/identified_book.dart';
-import 'package:shelf_snap/core/services/logger_service.dart';
+import 'package:shelf_snap/features/scanner/models/identified_book_model.dart';
 
 /// Sends on-device OCR output to a self-hosted Node.js API (Gemini-backed),
 /// which groups fragmented/garbled text blocks into individual books and
 /// infers likely real titles/authors using world knowledge.
 class BookIdentificationService {
-  static const _logger = LoggerService('BookIdentificationService');
-
   static const String _baseUrl = 'https://shelf-snap-gemini-wrapper-sand.vercel.app';
 
   /// Groups [blocks] of raw OCR text into distinct books and resolves
@@ -24,12 +21,10 @@ class BookIdentificationService {
     int imageHeight,
   ) async {
     if (blocks.isEmpty) {
-      _logger.debug('No OCR blocks passed in — skipping identify-books call');
       return [];
     }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _logger.warning('No signed-in Firebase user — skipping identify-books');
       return [];
     }
     final idToken = await user.getIdToken();
@@ -63,12 +58,10 @@ class BookIdentificationService {
           .timeout(const Duration(seconds: 60));
 
       if (response.statusCode != 200) {
-        _logger.warning('HTTP ${response.statusCode} — ${response.body}');
         return [];
       }
 
       final decoded = jsonDecode(response.body);
-      _logger.debug('identify-books response: $decoded');
       final List<dynamic> booksJson =
           (decoded is Map && decoded['books'] is List)
           ? decoded['books'] as List<dynamic>
@@ -85,7 +78,6 @@ class BookIdentificationService {
           .where((b) => b.title.isNotEmpty)
           .toList();
     } catch (e) {
-      _logger.error('Request failed', e);
       return [];
     }
   }

@@ -4,7 +4,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:shelf_snap/features/scanner/services/book_search_service.dart';
 import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
-import 'package:shelf_snap/core/services/logger_service.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/core/models/book_result.dart';
 import 'package:shelf_snap/features/scanner/widgets/genre_alert_sheet.dart';
@@ -12,7 +11,7 @@ import 'package:shelf_snap/features/library/widgets/library_picker_sheet.dart';
 import 'package:shelf_snap/features/scanner/widgets/scanner_empty_state.dart';
 import 'package:shelf_snap/features/scanner/widgets/scanner_sheet_header.dart';
 import 'package:shelf_snap/features/scanner/widgets/book_result_card.dart';
-import 'package:shelf_snap/features/scanner/models/identified_book.dart';
+import 'package:shelf_snap/features/scanner/models/identified_book_model.dart';
 import 'package:shelf_snap/features/scanner/services/book_identification_service.dart';
 
 /// Live camera scanner: captures a photo of a bookshelf, OCRs it, sends the
@@ -64,7 +63,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   // ─── Services ─────────────────────────────────────────
 
-  static const _logger = LoggerService('ScannerScreen');
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   final _bookIdentificationService = BookIdentificationService();
   final _bookSearchService = BookSearchService();
@@ -141,52 +139,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
     await _controller!.initialize();
   }
 
-  // ─── Debug logging ────────────────────────────────────
-
-  void _logIdentifiedBook(IdentifiedBook book, int index, int total) {
-    _logger.debug('[Book $index/$total] "${book.title}" by ${book.author}');
-  }
-
-  void _logSearch(String query, List<BookResult> candidates) {
-    _logger.debug('  Search: "$query"');
-    _logger.debug('  Candidates: ${candidates.length}');
-    for (final c in candidates.take(3)) {
-      _logger.debug('    - "${c.title}" by ${c.author ?? "?"}');
-    }
-  }
-
-  void _logScoring(List<ScoredBookResult> scored) {
-    for (final s in scored.take(3)) {
-      _logger.debug(
-        '  ${s.score.toStringAsFixed(2)} | "${s.book.title}"'
-        ' [${s.isConfident ? "confident" : "weak"}]',
-      );
-    }
-    if (scored.isEmpty) _logger.debug('  no results');
-  }
-
-  void _logResult(
-    ScoredBookResult? result, {
-    required bool skipped,
-    required bool discarded,
-  }) {
-    if (discarded) {
-      _logger.debug('  Discarded: below strong-match threshold');
-    } else if (skipped) {
-      _logger.debug('  Skipped: already in list');
-    } else if (result == null) {
-      _logger.debug('  No match found');
-    } else {
-      _logger.debug(
-        '  Added: "${result.book.title}"'
-        ' score=${result.score.toStringAsFixed(2)}'
-        ' isbn=${result.book.isbn ?? "none"}'
-        ' genres=${result.book.genres.isEmpty ? "none" : result.book.genres.join(", ")}'
-        ' cover=${result.book.coverUrl != null ? "yes" : "no"}',
-      );
-    }
-  }
-
   // ─── Capture + process ────────────────────────────────
 
   Future<void> _captureAndProcess() async {
@@ -218,12 +170,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
       // the user taps, avoiding a blurry frame on fast taps.
       await Future.delayed(const Duration(milliseconds: 400));
       final XFile photo = await _controller!.takePicture();
-      _logger.debug('\n--- CAPTURE #$_captureCount ---');
 
       // ── Step 2: OCR ──────────────────────────────────
       final inputImage = InputImage.fromFilePath(photo.path);
       final recognizedText = await _textRecognizer.processImage(inputImage);
-      _logger.debug('OCR blocks (raw): ${recognizedText.blocks.length}');
 
       // ── Step 3: Crop bottom 15% ───────────────────────
       // previewSize is reported in landscape on Android (width = long
@@ -234,22 +184,11 @@ class _ScannerScreenState extends State<ScannerScreen> {
       final imageWidth = _controller!.value.previewSize!.height.round();
       final imageHeight = _controller!.value.previewSize!.width;
       final cutoffY = imageHeight * 0.85;
-      final maxBlockBottom = recognizedText.blocks.isEmpty
-          ? 0
-          : recognizedText.blocks
-                .map((b) => b.boundingBox.bottom)
-                .reduce((a, b) => a > b ? a : b);
-      _logger.debug(
-        'previewSize=${_controller!.value.previewSize}'
-        ' imageWidth=$imageWidth imageHeight=$imageHeight'
-        ' cutoffY=$cutoffY maxBlockBottom=$maxBlockBottom',
-      );
 
       // Remove OCR blocks that were in the cut
       final filteredBlocks = recognizedText.blocks
           .where((b) => b.boundingBox.center.dy < cutoffY)
           .toList();
-      _logger.debug('OCR blocks (after bottom crop): ${filteredBlocks.length}');
 
       // ── Step 4: Identify books via Gemini ─────────────
       // Send all the filtered blocks to Gemini, no need for clustering anymore
@@ -259,28 +198,22 @@ class _ScannerScreenState extends State<ScannerScreen> {
             imageWidth,
             imageHeight.round(),
           );
-      _logger.debug('Books identified: ${identifiedBooks.length}');
 
       // ── Step 5: Search + score each identified book ──
       for (int i = 0; i < identifiedBooks.length; i++) {
         final book = identifiedBooks[i];
-        _logIdentifiedBook(book, i + 1, identifiedBooks.length);
 
         final List<BookResult> candidates = await _bookSearchService.search(
           book.searchQuery,
         );
-        _logSearch(book.searchQuery, candidates);
 
         final List<ScoredBookResult> scoredResults = _matchScoringService
             .scoreAndRank(book.searchQuery, candidates);
-        _logScoring(scoredResults);
 
         if (scoredResults.isNotEmpty && mounted) {
           final topMatch = scoredResults.first;
 
-          if (topMatch.score < _strongMatchThreshold) {
-            _logResult(null, skipped: false, discarded: true);
-          } else {
+          if (topMatch.score >= _strongMatchThreshold) {
             setState(() {
               final alreadyAdded = _results.any(
                 (r) =>
@@ -290,20 +223,12 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
               if (!alreadyAdded) {
                 _results.add(topMatch);
-                _logResult(topMatch, skipped: false, discarded: false);
-              } else {
-                _logResult(topMatch, skipped: true, discarded: false);
               }
             });
           }
-        } else {
-          _logResult(null, skipped: false, discarded: false);
         }
       }
-
-      _logger.debug('--- CAPTURE #$_captureCount END ---\n');
-    } catch (e, stackTrace) {
-      _logger.error('Capture/process failed', e, stackTrace);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
