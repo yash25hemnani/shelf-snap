@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/core/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 
 class LibraryRepository {
@@ -28,16 +28,21 @@ class LibraryRepository {
   }
 
   // Add a book to the libray
-  Future<void> addBook(String libraryId, BookResult book) async {
-    await _db
-        .collection("libraries")
-        .doc(libraryId)
-        .collection("books")
-        .add(book.toMap());
+  Future<void> addBook(String libraryId, BookModel book) async {
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+    final bookRef = libraryRef
+        .collection('books')
+        .doc(); // new id, nothing written yet
+
+    final batch = _db.batch();
+    batch.set(bookRef, book.toMap());
+    batch.update(libraryRef, {'bookCount': FieldValue.increment(1)});
+
+    await batch.commit();
   }
 
   // Watch books in a library
-  Stream<List<BookResult>> watchBooks(String libraryId) {
+  Stream<List<BookModel>> watchBooks(String libraryId) {
     return _db
         .collection('libraries')
         .doc(libraryId)
@@ -45,7 +50,7 @@ class LibraryRepository {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => BookResult.fromMap(doc.id, doc.data()))
+              .map((doc) => BookModel.fromMap(doc.id, doc.data()))
               .toList(),
         );
   }
@@ -57,11 +62,14 @@ class LibraryRepository {
 
   // Delete a book
   Future<void> deleteBook(String libraryId, String bookId) async {
-    await _db
-        .collection('libraries')
-        .doc(libraryId)
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+    final bookRef = libraryRef
         .collection('books')
-        .doc(bookId)
-        .delete();
+        .doc(bookId);
+
+    final batch = _db.batch();
+    batch.delete(bookRef);
+    batch.update(libraryRef, {'bookCount': FieldValue.increment(-1)});
+    await batch.commit();
   }
 }

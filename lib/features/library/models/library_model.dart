@@ -6,6 +6,7 @@ class LibraryModel {
   final String? description;
   final String? coverUrl;
   final String ownerId;
+  final int bookCount;
   final List<String> members;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -16,6 +17,7 @@ class LibraryModel {
     this.description,
     this.coverUrl,
     required this.ownerId,
+    this.bookCount = 0,
     this.members = const [],
     required this.createdAt,
     required this.updatedAt,
@@ -26,6 +28,7 @@ class LibraryModel {
     'description': description,
     'coverUrl': coverUrl,
     'ownerId': ownerId,
+    'bookCount': bookCount,  
     'members': members,
     'createdAt': Timestamp.fromDate(createdAt),
     'updatedAt': Timestamp.fromDate(updatedAt),
@@ -38,6 +41,7 @@ class LibraryModel {
       description: map['description'],
       coverUrl: map['coverUrl'],
       ownerId: map['ownerId'] ?? '',
+      bookCount: map['bookCount'] ?? 0,
       members: List<String>.from(map['members'] ?? []),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/core/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
@@ -68,7 +68,7 @@ class _LibraryPickerSheetState extends ConsumerState<LibraryPickerSheet> {
         final book = result.book;
         await repo.addBook(
           libraryId,
-          BookResult(
+          BookModel(
             title: book.title,
             author: book.author,
             isbn: book.isbn,

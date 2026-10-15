@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class BookResult {
+class BookModel {
   final String? id;
   final String title;
   final String? author;
@@ -8,7 +8,7 @@ class BookResult {
   final String? coverUrl;
   final DateTime addedAt;
 
-  BookResult({
+  BookModel({
     this.id,
     required this.title,
     this.author,
@@ -25,8 +25,8 @@ class BookResult {
     'addedAt': Timestamp.fromDate(addedAt),
   };
 
-  factory BookResult.fromMap(String id, Map<String, dynamic> map) {
-    return BookResult(
+  factory BookModel.fromMap(String id, Map<String, dynamic> map) {
+    return BookModel(
       id: id,
       title: map['title'] ?? 'Unknown Title',
       author: map['author'],
@@ -38,5 +38,5 @@ class BookResult {
 
   @override
   String toString() =>
-      'BookResult(id: $id, title: "$title", author: $author, isbn: $isbn)';
+      'BookModel(id: $id, title: "$title", author: $author, isbn: $isbn)';
 }
