@@ -6,7 +6,6 @@ class BookResult {
   final String? author;
   final String? isbn;
   final String? coverUrl;
-  final List<String> genres;
   final DateTime addedAt;
 
   BookResult({
@@ -15,7 +14,6 @@ class BookResult {
     this.author,
     this.isbn,
     this.coverUrl,
-    this.genres = const [],
     required this.addedAt,
   });
 
@@ -24,7 +22,6 @@ class BookResult {
     'author': author,
     'isbn': isbn,
     'coverUrl': coverUrl,
-    'genres': genres,
     'addedAt': Timestamp.fromDate(addedAt),
   };
 
@@ -35,12 +32,11 @@ class BookResult {
       author: map['author'],
       isbn: map['isbn'],
       coverUrl: map['coverUrl'],
-      genres: List<String>.from(map['genres'] ?? []),
       addedAt: (map['addedAt'] as Timestamp).toDate(),
     );
   }
 
   @override
   String toString() =>
-      'BookResult(id: $id, title: "$title", author: $author, isbn: $isbn, genres: $genres)';
+      'BookResult(id: $id, title: "$title", author: $author, isbn: $isbn)';
 }

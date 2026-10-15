@@ -14,7 +14,16 @@
       "Bash(flutter run *)",
       "Bash(cd \"c:/Users/it/StudioProjects/shelf_snap\" && cat -A /dev/null; sed -n '1,36p' \"C:\\\\Users\\\\it\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-it-StudioProjects-shelf-snap\\\\26bfcf45-8fbb-4c99-be07-afe710d8f758\\\\tasks\\\\bskk1qklg.output\")",
       "Read(//dev/**)",
-      "Bash(dart format *)"
+      "Bash(dart format *)",
+      "PowerShell(Resolve-DnsName dl.google.com -ErrorAction SilentlyContinue | Select-Object -First 2; Test-NetConnection dl.google.com -Port 443 -InformationLevel Quiet; Test-NetConnection repo.maven.apache.org -Port 443 -InformationLevel Quiet; Get-Content \"$env:USERPROFILE\\\\.gradle\\\\gradle.properties\" -ErrorAction SilentlyContinue)",
+      "PowerShell(flutter analyze lib/features/scanner)",
+      "PowerShell(adb devices)",
+      "PowerShell(adb logcat -d -s flutter)",
+      "PowerShell(Get-Date; \\(Get-Item lib/features/scanner/screens/scanner_screen.dart\\).LastWriteTime; adb shell date)",
+      "PowerShell(adb logcat -c; $job = Start-Job { adb logcat -s flutter }; Start-Sleep -Seconds 120; Stop-Job $job; Receive-Job $job | Select-String -Pattern 'Scanner|Identify|Search|Exception|Error' | Select-Object -Last 100)",
+      "PowerShell(git -C \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\" ls-files)",
+      "PowerShell(git -C \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\" status --short)",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] }; Get-Content \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] })"
     ],
     "additionalDirectories": [
       "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res"
