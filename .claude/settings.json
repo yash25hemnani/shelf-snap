@@ -23,7 +23,10 @@
       "PowerShell(adb logcat -c; $job = Start-Job { adb logcat -s flutter }; Start-Sleep -Seconds 120; Stop-Job $job; Receive-Job $job | Select-String -Pattern 'Scanner|Identify|Search|Exception|Error' | Select-Object -Last 100)",
       "PowerShell(git -C \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\" ls-files)",
       "PowerShell(git -C \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\" status --short)",
-      "PowerShell(Get-Content \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] }; Get-Content \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] })"
+      "PowerShell(Get-Content \"C:\\\\Users\\\\it\\\\Desktop\\\\Projects\\\\shelf-snap-groq-wrapper\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] }; Get-Content \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\\\\.env\" | ForEach-Object { \\($_ -split '='\\)[0] })",
+      "mcp__claude-vscode__getDiagnostics",
+      "PowerShell(git mv lib/core/models/book_result.dart lib/core/models/book_model.dart)",
+      "PowerShell(flutter analyze)"
     ],
     "additionalDirectories": [
       "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res"

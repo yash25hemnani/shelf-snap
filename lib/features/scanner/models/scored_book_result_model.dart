@@ -1,12 +1,12 @@
-import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/core/models/book_model.dart';
 
-/// A [BookResult] paired with the backend's similarity score between the
+/// A [BookModel] paired with the backend's similarity score between the
 /// book read off the spine and its Google Books listing.
 class ScoredBookResult {
   /// Minimum score to consider a result a "confident" match.
   static const double _confidentMatchThreshold = 0.4;
 
-  final BookResult book;
+  final BookModel book;
 
   /// Similarity score 0.0–1.0. Higher = better match.
   final double score;

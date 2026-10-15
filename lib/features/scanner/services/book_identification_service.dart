@@ -5,7 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/core/models/book_model.dart';
 import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
 
 /// Sends the shelf photo plus on-device OCR output to a self-hosted Node.js
@@ -119,7 +119,7 @@ class BookIdentificationService {
           .where((b) => (b['title'] ?? '').toString().isNotEmpty)
           .map(
             (b) => ScoredBookResult(
-              book: BookResult(
+              book: BookModel(
                 title: b['title'].toString(),
                 author: b['author'] as String?,
                 isbn: b['isbn'] as String?,

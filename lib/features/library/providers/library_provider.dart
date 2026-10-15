@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
-import 'package:shelf_snap/core/models/book_result.dart';
+import 'package:shelf_snap/core/models/book_model.dart';
 
 final libraryRepositoryProvider = Provider((ref) => LibraryRepository());
 
@@ -11,6 +11,6 @@ final userLibrariesProvider = StreamProvider.family<List<LibraryModel>, String>(
 );
 
 // Books inside a specific library
-final libraryBooksProvider = StreamProvider.family<List<BookResult>, String>(
+final libraryBooksProvider = StreamProvider.family<List<BookModel>, String>(
       (ref, libraryId) => ref.watch(libraryRepositoryProvider).watchBooks(libraryId),
 );
