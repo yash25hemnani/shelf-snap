@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/models/book_result.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
-import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
+import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
 
 enum LibraryPickerResult { saved, discarded }
 
@@ -73,7 +73,6 @@ class _LibraryPickerSheetState extends ConsumerState<LibraryPickerSheet> {
             author: book.author,
             isbn: book.isbn,
             coverUrl: book.coverUrl,
-            genres: book.genres,
             addedAt: DateTime.now(),
           ),
         );

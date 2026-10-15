@@ -14,8 +14,3 @@ final userLibrariesProvider = StreamProvider.family<List<LibraryModel>, String>(
 final libraryBooksProvider = StreamProvider.family<List<BookResult>, String>(
       (ref, libraryId) => ref.watch(libraryRepositoryProvider).watchBooks(libraryId),
 );
-
-// Available genres
-final genresProvider = FutureProvider<List<String>>(
-      (ref) => ref.watch(libraryRepositoryProvider).fetchGenres(),
-);

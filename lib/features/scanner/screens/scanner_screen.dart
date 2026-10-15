@@ -2,23 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:shelf_snap/features/scanner/services/book_search_service.dart';
-import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
-import 'package:shelf_snap/core/models/book_result.dart';
-import 'package:shelf_snap/features/scanner/widgets/genre_alert_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/library_picker_sheet.dart';
 import 'package:shelf_snap/features/scanner/widgets/scanner_empty_state.dart';
 import 'package:shelf_snap/features/scanner/widgets/scanner_sheet_header.dart';
 import 'package:shelf_snap/features/scanner/widgets/book_result_card.dart';
-import 'package:shelf_snap/features/scanner/models/identified_book_model.dart';
+import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
 import 'package:shelf_snap/features/scanner/services/book_identification_service.dart';
 
-/// Live camera scanner: captures a photo of a bookshelf, OCRs it, sends the
-/// text to [BookIdentificationService] to resolve individual books, then
-/// looks each one up via [BookSearchService] and ranks candidates with
-/// [MatchScoringService]. Confirmed matches accumulate in a results sheet
-/// the user can keep scanning into.
+/// Live camera scanner: captures a photo of a bookshelf, OCRs it, and sends
+/// both to [BookIdentificationService], whose backend identifies the books
+/// and returns scored Google Books matches. Matches accumulate in a results
+/// sheet the user can keep scanning into.
 class ScannerScreen extends StatefulWidget {
   const ScannerScreen({super.key});
 
@@ -32,41 +27,10 @@ class _ScannerScreenState extends State<ScannerScreen> {
   CameraController? _controller;
   Future<void>? _initializeControllerFuture;
 
-  // ─── Genre alerts ─────────────────────────────────────
-
-  Set<String> _watchedGenres = {};
-
-  void _openGenreAlerts() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return GenreAlertSheet(
-            watchedGenres: _watchedGenres,
-            onChanged: (updated) {
-              setState(() => _watchedGenres = updated);
-              setModalState(() {});
-            },
-            onClearAll: () {
-              setState(() => _watchedGenres = {});
-              setModalState(() {});
-            },
-          );
-        },
-      ),
-    );
-  }
-
   // ─── Services ─────────────────────────────────────────
 
   final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
   final _bookIdentificationService = BookIdentificationService();
-  final _bookSearchService = BookSearchService();
-  final _matchScoringService = MatchScoringService();
 
   // ─── Session state ────────────────────────────────────
 
@@ -74,10 +38,6 @@ class _ScannerScreenState extends State<ScannerScreen> {
   int _captureCount = 0;
   int _activeProcessingCount = 0;
   static const int _maxConcurrentCaptures = 3;
-
-  // Top match must score at least this well to be kept; weaker matches are
-  // shown to the user as noise otherwise, since OCR text is often messy.
-  static const double _strongMatchThreshold = 0.6;
 
   bool get _isProcessing => _activeProcessingCount > 0;
 
@@ -190,45 +150,32 @@ class _ScannerScreenState extends State<ScannerScreen> {
           .where((b) => b.boundingBox.center.dy < cutoffY)
           .toList();
 
-      // ── Step 4: Identify books via Gemini ─────────────
-      // Send all the filtered blocks to Gemini, no need for clustering anymore
-      final List<IdentifiedBook> identifiedBooks =
-          await _bookIdentificationService.identifyBooks(
+      // ── Step 4: Identify + look up books on the backend ──
+      // Send the photo plus filtered OCR blocks as hints. The backend
+      // returns only strong Google Books matches, already scored.
+      final List<ScoredBookResult> matches = await _bookIdentificationService
+          .identifyBooks(
+            photo.path,
             filteredBlocks,
             imageWidth,
             imageHeight.round(),
           );
 
-      // ── Step 5: Search + score each identified book ──
-      for (int i = 0; i < identifiedBooks.length; i++) {
-        final book = identifiedBooks[i];
-
-        final List<BookResult> candidates = await _bookSearchService.search(
-          book.searchQuery,
-        );
-
-        final List<ScoredBookResult> scoredResults = _matchScoringService
-            .scoreAndRank(book.searchQuery, candidates);
-
-        if (scoredResults.isNotEmpty && mounted) {
-          final topMatch = scoredResults.first;
-
-          if (topMatch.score >= _strongMatchThreshold) {
-            setState(() {
-              final alreadyAdded = _results.any(
-                (r) =>
-                    r.book.title.toLowerCase() ==
-                    topMatch.book.title.toLowerCase(),
-              );
-
-              if (!alreadyAdded) {
-                _results.add(topMatch);
-              }
-            });
+      // ── Step 5: Add new matches to the session ───────
+      // Earlier captures may already have found the same book.
+      if (mounted) {
+        setState(() {
+          for (final match in matches) {
+            final alreadyAdded = _results.any(
+              (r) =>
+                  r.book.title.toLowerCase() == match.book.title.toLowerCase(),
+            );
+            if (!alreadyAdded) _results.add(match);
           }
-        }
+        });
       }
     } catch (e) {
+      debugPrint('[Scanner] Capture failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -312,44 +259,13 @@ class _ScannerScreenState extends State<ScannerScreen> {
               Positioned(
                 top: 48,
                 right: 16,
-                child: Column(
-                  children: [
-                    IconButton.filled(
-                      onPressed: _cycleFlashMode,
-                      icon: Icon(_flashIcon),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black45,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    IconButton.filled(
-                      onPressed: _openGenreAlerts,
-                      icon: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          const Icon(Icons.notifications_outlined),
-                          if (_watchedGenres.isNotEmpty)
-                            Positioned(
-                              top: -2,
-                              right: -2,
-                              child: Container(
-                                width: 8,
-                                height: 8,
-                                decoration: const BoxDecoration(
-                                  color: Colors.redAccent,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.black45,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
+                child: IconButton.filled(
+                  onPressed: _cycleFlashMode,
+                  icon: Icon(_flashIcon),
+                  style: IconButton.styleFrom(
+                    backgroundColor: Colors.black45,
+                    foregroundColor: Colors.white,
+                  ),
                 ),
               ),
 

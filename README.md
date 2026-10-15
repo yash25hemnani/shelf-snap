@@ -7,7 +7,7 @@ A Flutter app that turns a photo of a bookshelf into a searchable digital librar
 1. **Capture** — the scanner screen takes a photo of the shelf and runs on-device OCR ([google_mlkit_text_recognition](https://pub.dev/packages/google_mlkit_text_recognition)) to pull raw text blocks off the spines.
 2. **Identify** — the OCR blocks (with their bounding boxes) are sent to a self-hosted Gemini-backed API, which groups fragments into individual books and infers their real titles/authors.
 3. **Search + score** — each identified book is searched against the Google Books API and candidates are ranked by similarity to filter out weak/false matches.
-4. **Save** — confirmed matches can be added to one of the user's libraries, with genre alerts available for books added into watched genres.
+4. **Save** — confirmed matches can be added to one of the user's libraries.
 
 ## Project structure
 

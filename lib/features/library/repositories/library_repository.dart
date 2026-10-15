@@ -34,11 +34,6 @@ class LibraryRepository {
         .doc(libraryId)
         .collection("books")
         .add(book.toMap());
-
-    // Accumulate genres
-    await _db.doc('meta/genres').set({
-      'list': FieldValue.arrayUnion(book.genres),
-    }, SetOptions(merge: true));
   }
 
   // Watch books in a library
@@ -68,11 +63,5 @@ class LibraryRepository {
         .collection('books')
         .doc(bookId)
         .delete();
-  }
-
-  // Fetch genres
-  Future<List<String>> fetchGenres() async {
-    final doc = await _db.doc('meta/genres').get();
-    return List<String>.from(doc['list'] ?? []);
   }
 }

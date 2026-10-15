@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shelf_snap/features/scanner/services/match_scoring_service.dart';
+import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
 import 'package:shelf_snap/features/scanner/widgets/book_cover_placeholder.dart';
 import 'package:shelf_snap/features/scanner/widgets/confidence_badge.dart';
 
