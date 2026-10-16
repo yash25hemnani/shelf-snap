@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
+import 'package:shelf_snap/core/config/api_config.dart';
 import 'package:shelf_snap/core/models/book_model.dart';
 import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
 
@@ -16,14 +16,7 @@ class BookIdentificationService {
   // Set API_BASE_URL in .env, or pass
   //   flutter run --dart-define=API_BASE_URL=https://shelf-snap-wrapper.vercel.app
   // Defaults to the local server (reached via `adb reverse tcp:3000 tcp:3000`).
-  static String get _baseUrl {
-    final fromEnv = dotenv.env['API_BASE_URL']?.trim() ?? '';
-    if (fromEnv.isNotEmpty) return fromEnv.replaceAll(RegExp(r'/+$'), '');
-    return const String.fromEnvironment(
-      'API_BASE_URL',
-      defaultValue: 'http://localhost:3000',
-    );
-  }
+  final _baseUrl = ApiConfig.baseUrl;
 
   // Long edge of the uploaded image. Large enough for spine text to stay
   // legible, small enough to keep the upload a few hundred KB.

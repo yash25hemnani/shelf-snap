@@ -6,6 +6,9 @@ class BookModel {
   final String? author;
   final String? isbn;
   final String? coverUrl;
+  final String? description;
+  final String? publishedDate;
+  final int? pageCount;
   final DateTime addedAt;
 
   BookModel({
@@ -14,6 +17,9 @@ class BookModel {
     this.author,
     this.isbn,
     this.coverUrl,
+    this.description,
+    this.publishedDate,
+    this.pageCount,
     required this.addedAt,
   });
 
@@ -23,6 +29,9 @@ class BookModel {
     'isbn': isbn,
     'coverUrl': coverUrl,
     'addedAt': Timestamp.fromDate(addedAt),
+    'description': description,
+    'publishedDate': publishedDate,
+    'pageCount': pageCount,
   };
 
   factory BookModel.fromMap(String id, Map<String, dynamic> map) {
@@ -33,6 +42,9 @@ class BookModel {
       isbn: map['isbn'],
       coverUrl: map['coverUrl'],
       addedAt: (map['addedAt'] as Timestamp).toDate(),
+      description: map['description'],
+      publishedDate: map['publishedDate'],
+      pageCount: (map['pageCount'] as num?)?.toInt(),
     );
   }
 

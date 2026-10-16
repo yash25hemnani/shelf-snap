@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/dialogs/add_book_dialog.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
 
 class LibraryDetailScreen extends ConsumerWidget {
@@ -44,7 +45,15 @@ class LibraryDetailScreen extends ConsumerWidget {
             itemCount: books.length,
             itemBuilder: (context, index) {
               final book = books[index];
-              return BookCard(book: book);
+              return BookCard(
+                book: book,
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => BookDetailScreen(book: book),
+                  ),
+                ),
+              );
             },
           );
         },

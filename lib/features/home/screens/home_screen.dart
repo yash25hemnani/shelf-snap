@@ -3,6 +3,7 @@ import 'package:shelf_snap/features/home/models/nav_item_model.dart';
 import 'package:shelf_snap/features/library/screens/library_screen.dart';
 import 'package:shelf_snap/features/scanner/screens/scanner_screen.dart';
 import 'package:shelf_snap/features/home/widgets/bottom_navbar.dart';
+import 'package:shelf_snap/features/search/screens/search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
       label: "Home",
     ),
     NavItemModel(
-      page: const Center(child: Text("Search")),
+      page: SearchScreen(),
       icon: Icons.search_outlined,
       activeIcon: Icons.search,
       label: "Search",
@@ -34,7 +35,10 @@ class _HomeScreenState extends State<HomeScreen> {
       label: "Scan",
       redirect: () => Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const ScannerScreen()),
+        MaterialPageRoute(
+          builder: (context) => const ScannerScreen(),
+          fullscreenDialog: true,
+        ),
       ),
     ),
     NavItemModel(
