@@ -1,351 +1,229 @@
-import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
-import 'package:shelf_snap/features/auth/services/auth_service.dart';
-import 'package:shelf_snap/features/library/widgets/library_picker_sheet.dart';
-import 'package:shelf_snap/features/scanner/widgets/scanner_empty_state.dart';
-import 'package:shelf_snap/features/scanner/widgets/scanner_sheet_header.dart';
-import 'package:shelf_snap/features/scanner/widgets/book_result_card.dart';
-import 'package:shelf_snap/features/scanner/models/scored_book_result_model.dart';
-import 'package:shelf_snap/features/scanner/services/book_identification_service.dart';
+import 'package:shelf_snap/features/scanner/models/scan_mode.dart';
+import 'package:shelf_snap/features/scanner/providers/scan_session_provider.dart';
+import 'package:shelf_snap/features/scanner/widgets/barcode_scanner_view.dart';
+import 'package:shelf_snap/features/scanner/widgets/scan_count_badge.dart';
+import 'package:shelf_snap/features/scanner/widgets/scan_input_toggle.dart';
+import 'package:shelf_snap/features/scanner/widgets/scan_mode_toggle.dart';
+import 'package:shelf_snap/features/scanner/widgets/scan_results_sheet.dart';
+import 'package:shelf_snap/features/scanner/widgets/scanner_camera_view.dart';
+import 'package:shelf_snap/features/scanner/widgets/shutter_button.dart';
+import 'package:shelf_snap/features/search/providers/search_provider.dart';
 
-/// Live camera scanner: captures a photo of a bookshelf, OCRs it, and sends
-/// both to [BookIdentificationService], whose backend identifies the books
-/// and returns scored Google Books matches. Matches accumulate in a results
-/// sheet the user can keep scanning into.
-class ScannerScreen extends StatefulWidget {
+class ScannerScreen extends ConsumerStatefulWidget {
   const ScannerScreen({super.key});
 
   @override
-  State<ScannerScreen> createState() => _ScannerScreenState();
+  ConsumerState<ScannerScreen> createState() => _ScannerScreenState();
 }
 
-class _ScannerScreenState extends State<ScannerScreen> {
-  // ─── Camera ───────────────────────────────────────────
-
+class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   CameraController? _controller;
-  Future<void>? _initializeControllerFuture;
+  late Future<CameraController> _cameraFuture;
 
-  // ─── Services ─────────────────────────────────────────
+  ScanMode _mode = ScanMode.add;
+  ScanInput _input = ScanInput.shelf;
+  final _scannedIsbns = <String>{};
 
-  final _textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
-  final _bookIdentificationService = BookIdentificationService();
+  void _setMode(ScanMode mode) {
+    setState(() {
+      _mode = mode;
+    });
 
-  // ─── Session state ────────────────────────────────────
+    if (mode == ScanMode.discover) _setInput(ScanInput.shelf);
+  }
 
-  final List<ScoredBookResult> _results = [];
-  int _captureCount = 0;
-  int _activeProcessingCount = 0;
-  static const int _maxConcurrentCaptures = 3;
+  Future<void> _setInput(ScanInput input) async {
+    if (input == _input) return;
 
-  bool get _isProcessing => _activeProcessingCount > 0;
-
-  // ─── Flash ────────────────────────────────────────────
-
-  FlashMode _flashMode = FlashMode.off;
-
-  void _cycleFlashMode() async {
-    final modes = [FlashMode.off, FlashMode.auto, FlashMode.torch];
-    final next = modes[(modes.indexOf(_flashMode) + 1) % modes.length];
-    try {
-      await _controller?.setFlashMode(next);
-      setState(() => _flashMode = next);
-    } on CameraException {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Flash mode not supported on this device'),
-          ),
-        );
-      }
+    if (input == ScanInput.barcode) {
+      final controller = _controller;
+      _controller = null;
+      await controller
+          ?.dispose(); // free the camera before mobile scanner opens it
+      if (!mounted) return;
+      setState(() {
+        _input = input;
+      });
+    } else {
+      setState(() {
+        _input = input;
+        _cameraFuture = _setupCamera();
+      });
     }
   }
 
-  IconData get _flashIcon => switch (_flashMode) {
-    FlashMode.off => Icons.flash_off,
-    FlashMode.auto => Icons.flash_auto,
-    FlashMode.torch => Icons.flashlight_on,
-    _ => Icons.flash_off,
-  };
+  Future<void> _onIsbn(String isbn) async {
+    if (!_scannedIsbns.add(isbn)) {
+      debugPrint('[Barcode] duplicate: $isbn');
+      return;
+    }
+    debugPrint('[Barcode] new: $isbn, looking up...');
 
-  // ─── Lifecycle ────────────────────────────────────────
+    try {
+      final book = await ref.read(bookSearchServiceProvider).lookupIsbn(isbn);
+      if (book == null) {
+        debugPrint('[Barcode] not found: $isbn');
+      } else {
+        debugPrint('[Barcode] found: ${book.title} by ${book.author}');
+      }
+    } catch (e) {
+      _scannedIsbns.remove(isbn); // let a rescan try again
+      debugPrint('[Barcode] lookup failed for $isbn: $e');
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _initializeControllerFuture = _setupCamera();
+    _cameraFuture = _setupCamera();
+  }
+
+  Future<CameraController> _setupCamera() async {
+    final status = await Permission.camera.request();
+    if (!status.isGranted) throw Exception('Camera permission not granted');
+
+    final cameras = await availableCameras();
+
+    final back = cameras.firstWhere(
+      (c) => c.lensDirection == CameraLensDirection.back,
+    );
+
+    final controller = CameraController(
+      back,
+      ResolutionPreset.high,
+      enableAudio: false,
+    );
+
+    _controller = controller;
+    await controller.initialize();
+
+    return controller;
+  }
+
+  Future<void> _captureShelf() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isTakingPicture) return;
+
+    final notifier = ref.read(scanSessionProvider.notifier);
+
+    if (ref.read(scanSessionProvider).pending >= ScanSessionNotifier.maxPending)
+      return;
+
+    notifier.startProcessing();
+
+    try {
+      final photo = await controller.takePicture();
+      final results = await ref
+          .read(shelfCaptureServiceProvider)
+          .identify(photo.path, controller.value.previewSize!);
+
+      if (!mounted) return;
+      notifier.addResults(results);
+    } catch (e) {
+      if (!mounted) return;
+      notifier.failProcessing();
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Capture failed: $e')));
+    }
+  }
+
+  void _showResults() {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (_) => const ScanResultsSheet(),
+    );
   }
 
   @override
   void dispose() {
     _controller?.dispose();
-    _textRecognizer.close();
     super.dispose();
   }
 
-  // ─── Camera setup ─────────────────────────────────────
-
-  Future<void> _setupCamera() async {
-    final status = await Permission.camera.request();
-    if (!status.isGranted) throw Exception('Camera permission not granted');
-
-    final cameras = await availableCameras();
-    final backCamera = cameras.firstWhere(
-      (c) => c.lensDirection == CameraLensDirection.back,
-    );
-
-    _controller = CameraController(backCamera, ResolutionPreset.high);
-    await _controller!.initialize();
-  }
-
-  // ─── Capture + process ────────────────────────────────
-
-  Future<void> _captureAndProcess() async {
-    // If camera not initialized, return
-    if (_controller == null || !_controller!.value.isInitialized) return;
-
-    // If more than 3 pictures processing, show message on snackbar and return
-    if (_activeProcessingCount >= _maxConcurrentCaptures) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Still processing, please wait a moment...'),
-            duration: Duration(seconds: 1),
-          ),
-        );
-      }
-      return;
-    }
-
-    // Increase capture count and processing count
-    setState(() {
-      _activeProcessingCount++;
-      _captureCount++;
-    });
-
-    try {
-      // ── Step 1: Capture ──────────────────────────────
-      // Brief delay lets the camera settle (focus/exposure) right after
-      // the user taps, avoiding a blurry frame on fast taps.
-      await Future.delayed(const Duration(milliseconds: 400));
-      final XFile photo = await _controller!.takePicture();
-
-      // ── Step 2: OCR ──────────────────────────────────
-      final inputImage = InputImage.fromFilePath(photo.path);
-      final recognizedText = await _textRecognizer.processImage(inputImage);
-
-      // ── Step 3: Crop bottom 15% ───────────────────────
-      // previewSize is reported in landscape on Android (width = long
-      // edge), so in portrait, image height maps to previewSize.width and
-      // image width maps to previewSize.height.
-
-      // We are doing this because 15% of screen is hidden by the srollable section
-      final imageWidth = _controller!.value.previewSize!.height.round();
-      final imageHeight = _controller!.value.previewSize!.width;
-      final cutoffY = imageHeight * 0.85;
-
-      // Remove OCR blocks that were in the cut
-      final filteredBlocks = recognizedText.blocks
-          .where((b) => b.boundingBox.center.dy < cutoffY)
-          .toList();
-
-      // ── Step 4: Identify + look up books on the backend ──
-      // Send the photo plus filtered OCR blocks as hints. The backend
-      // returns only strong Google Books matches, already scored.
-      final List<ScoredBookResult> matches = await _bookIdentificationService
-          .identifyBooks(
-            photo.path,
-            filteredBlocks,
-            imageWidth,
-            imageHeight.round(),
-          );
-
-      // ── Step 5: Add new matches to the session ───────
-      // Earlier captures may already have found the same book.
-      if (mounted) {
-        setState(() {
-          for (final match in matches) {
-            final alreadyAdded = _results.any(
-              (r) =>
-                  r.book.title.toLowerCase() == match.book.title.toLowerCase(),
-            );
-            if (!alreadyAdded) _results.add(match);
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint('[Scanner] Capture failed: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _activeProcessingCount--);
-    }
-  }
-
-  // ─── Remove a result ──────────────────────────────────
-
-  void _removeResult(int index) => setState(() => _results.removeAt(index));
-
-  // ─── Back navigation ──────────────────────────────────
-
-  Future<void> _confirmBack(BuildContext context) async {
-    if (_results.isEmpty) {
-      Navigator.of(context).pop();
-      return;
-    }
-
-    final userId = AuthService().currentUser?.uid;
-    if (userId == null) {
-      Navigator.of(context).pop();
-      return;
-    }
-
-    final result = await showModalBottomSheet<LibraryPickerResult>(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => LibraryPickerSheet(userId: userId, results: _results),
-    );
-
-    if (!context.mounted) return;
-
-    // Sheet dismissed without choosing (tap outside / swipe down) means the
-    // user wants to keep scanning, so stay on this screen.
-    if (result != null) {
-      Navigator.of(context).pop();
-    }
-  }
-
-  // ─── Build ────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
+    final session = ref.watch(scanSessionProvider);
+    ref.watch(
+      shelfCaptureServiceProvider,
+    ); // keep the OCR service alive while the screen is open
+
     return Scaffold(
-      body: FutureBuilder<void>(
-        future: _initializeControllerFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          if (snapshot.connectionState == ConnectionState.waiting ||
-              _controller == null ||
-              !_controller!.value.isInitialized) {
-            return const Center(child: CircularProgressIndicator());
-          }
+      backgroundColor: Colors.black,
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity < -200 && session.results.isNotEmpty) _showResults();
+        },
+        child: Stack(
+          children: [
+            if (_input == ScanInput.barcode)
+              Positioned.fill(child: BarcodeScannerView(onIsbn: _onIsbn,))
+            else
+              ScannerCameraView(camera: _cameraFuture),
 
-          return Stack(
-            children: [
-              Positioned.fill(child: CameraPreview(_controller!)),
-
-              Positioned(
-                top: 48,
-                left: 16,
-                child: IconButton.filled(
-                  onPressed: () => _confirmBack(context),
-                  icon: BackButtonIcon(),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black45,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-
-              Positioned(
-                top: 48,
-                right: 16,
-                child: IconButton.filled(
-                  onPressed: _cycleFlashMode,
-                  icon: Icon(_flashIcon),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black45,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ),
-
-              // Bottom sheet listing books found so far. Starts mostly
-              // collapsed so it doesn't obscure the camera preview, and can
-              // be dragged up to review/remove results.
-              DraggableScrollableSheet(
-                initialChildSize: 0.18,
-                minChildSize: 0.18,
-                maxChildSize: 0.85,
-                builder: (context, scrollController) {
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(20),
+            SafeArea(
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close),
+                        color: Colors.white,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, -4),
+                      Expanded(
+                        child: Center(
+                          child: ScanModeToggle(
+                            mode: _mode,
+                            onChanged: _setMode,
+                          ),
                         ),
-                      ],
-                    ),
-                    child: Column(
+                      ),
+                      const SizedBox(width: 48),
+                    ],
+                  ),
+                  const Spacer(),
+                  if (_mode == ScanMode.add)
+                    ScanInputToggle(input: _input, onChanged: _setInput),
+
+                  if (_input == ScanInput.shelf) ...[
+                    const SizedBox(height: 16),
+                    Row(
                       children: [
-                        ScannerSheetHeader(
-                          resultCount: _results.length,
-                          captureCount: _captureCount,
-                          isProcessing: _isProcessing,
-                          activeProcessingCount: _activeProcessingCount,
+                        const Spacer(),
+                        ShutterButton(
+                          pending: session.pending,
+                          maxPending: ScanSessionNotifier.maxPending,
+                          onPressed: _captureShelf,
                         ),
-                        if (_isProcessing)
-                          LinearProgressIndicator(
-                            backgroundColor: Colors.grey[800],
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Theme.of(context).colorScheme.primary,
+                        Expanded(
+                          child: Center(
+                            child: ScanCountBadge(
+                              count: session.results.length,
+                              onTap: session.results.isEmpty
+                                  ? null
+                                  : _showResults,
                             ),
                           ),
-                        const Divider(height: 1),
-                        Expanded(
-                          child: _results.isEmpty
-                              ? const ScannerEmptyState()
-                              : ListView.separated(
-                                  controller: scrollController,
-                                  itemCount: _results.length,
-                                  separatorBuilder: (_, __) =>
-                                      const Divider(height: 1),
-                                  itemBuilder: (context, index) =>
-                                      BookResultCard(
-                                        result: _results[index],
-                                        index: index,
-                                        onDismissed: () => _removeResult(index),
-                                      ),
-                                ),
                         ),
                       ],
                     ),
-                  );
-                },
-              ),
+                  ],
 
-              Positioned(
-                bottom: MediaQuery.of(context).size.height * 0.18 - 20,
-                right: 16,
-                child: SizedBox(
-                  width: 68,
-                  height: 68,
-                  child: FloatingActionButton(
-                    onPressed: _captureAndProcess,
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    shape: const CircleBorder(),
-                    child: const Icon(Icons.camera_alt, size: 32),
-                  ),
-                ),
+                  const SizedBox(height: 24),
+                ],
               ),
-            ],
-          );
-        },
+            ),
+          ],
+        ),
       ),
     );
   }
