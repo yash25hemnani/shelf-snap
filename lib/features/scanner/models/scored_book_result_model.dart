@@ -1,4 +1,4 @@
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 
 /// A [BookModel] paired with the backend's similarity score between the
 /// book read off the spine and its Google Books listing.

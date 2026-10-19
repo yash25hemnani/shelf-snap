@@ -31,11 +31,18 @@
       "PowerShell(flutter analyze lib/features/home lib/features/scanner/screens)",
       "PowerShell(git rm -q lib/features/library/widgets/library_picker_sheet.dart)",
       "PowerShell(flutter analyze lib)",
-      "PowerShell(flutter analyze lib/features/library)"
+      "PowerShell(flutter analyze lib/features/library)",
+      "PowerShell(flutter analyze lib/features/reading)",
+      "PowerShell(git checkout -- lib/features/library/screens/book_detail_screen.dart lib/features/library/screens/library_detail_screen.dart)",
+      "Bash(rm -r lib/features/reading)",
+      "PowerShell(git log --all --oneline -S \"normalize\\(\" -- lib; git grep -n \"normalize\" $\\(git rev-list --all\\) -- lib 2>$null | Select-Object -First 20)",
+      "PowerShell(dart format lib/features/reading/models/reading_log_model.dart)",
+      "PowerShell(dart analyze lib/features/reading/models/reading_log_model.dart)"
     ],
     "additionalDirectories": [
       "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res",
-      "C:\\Users\\it\\StudioProjects\\shelf_snap\\test"
+      "C:\\Users\\it\\StudioProjects\\shelf_snap\\test",
+      "C:\\Users\\it\\StudioProjects\\shelf_snap\\lib\\features\\reading"
     ]
   }
 }

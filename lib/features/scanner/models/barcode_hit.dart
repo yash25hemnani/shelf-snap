@@ -1,4 +1,4 @@
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 
 enum HitStatus { loading, found, notFound }
 
