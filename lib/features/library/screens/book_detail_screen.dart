@@ -56,13 +56,22 @@ class BookDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(book.title, style: theme.textTheme.titleLarge),
+                      if (book.subtitle != null)
+                        Text(book.subtitle!, style: theme.textTheme.titleSmall),
                       const SizedBox(height: 4),
-                      Text(book.author ?? 'Unknown author', style: muted),
+                      Text(book.authorLine ?? 'Unknown author', style: muted),
                       const SizedBox(height: 12),
+                      if (book.publisher != null)
+                        Text(book.publisher!, style: muted),
                       if (book.publishedDate != null)
                         Text('Published ${book.publishedDate}', style: muted),
                       if (book.pageCount != null)
                         Text('${book.pageCount} pages', style: muted),
+                      if (book.language != null)
+                        Text(
+                          'Language: ${book.language!.toUpperCase()}',
+                          style: muted,
+                        ),
                       if (book.isbn != null)
                         Text('ISBN ${book.isbn}', style: muted),
                     ],
@@ -70,6 +79,17 @@ class BookDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
+            if (book.categories.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final category in book.categories)
+                    Chip(label: Text(category)),
+                ],
+              ),
+            ],
             const SizedBox(height: 24),
             Text('Summary', style: theme.textTheme.titleMedium),
             const SizedBox(height: 8),

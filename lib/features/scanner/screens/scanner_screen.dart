@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shelf_snap/features/scanner/models/scan_mode.dart';
+import 'package:shelf_snap/features/scanner/providers/barcode_session_provider.dart';
 import 'package:shelf_snap/features/scanner/providers/scan_session_provider.dart';
 import 'package:shelf_snap/features/scanner/widgets/barcode_scanner_view.dart';
+import 'package:shelf_snap/features/scanner/widgets/barcode_sheet.dart';
 import 'package:shelf_snap/features/scanner/widgets/scan_count_badge.dart';
 import 'package:shelf_snap/features/scanner/widgets/scan_input_toggle.dart';
 import 'package:shelf_snap/features/scanner/widgets/scan_mode_toggle.dart';
@@ -26,7 +28,6 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   ScanMode _mode = ScanMode.add;
   ScanInput _input = ScanInput.shelf;
-  final _scannedIsbns = <String>{};
 
   void _setMode(ScanMode mode) {
     setState(() {
@@ -57,21 +58,22 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 
   Future<void> _onIsbn(String isbn) async {
-    if (!_scannedIsbns.add(isbn)) {
+    final notifier = ref.read(barcodeSessionProvider.notifier);
+
+    if (!notifier.add(isbn)) {
       debugPrint('[Barcode] duplicate: $isbn');
       return;
     }
+
     debugPrint('[Barcode] new: $isbn, looking up...');
 
     try {
       final book = await ref.read(bookSearchServiceProvider).lookupIsbn(isbn);
-      if (book == null) {
-        debugPrint('[Barcode] not found: $isbn');
-      } else {
-        debugPrint('[Barcode] found: ${book.title} by ${book.author}');
-      }
+      if (!mounted) return;
+      notifier.resolve(isbn, book);
     } catch (e) {
-      _scannedIsbns.remove(isbn); // let a rescan try again
+      if (!mounted) return;
+      notifier.remove(isbn); // let a rescan try again
       debugPrint('[Barcode] lookup failed for $isbn: $e');
     }
   }
@@ -137,7 +139,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
-      builder: (_) => const ScanResultsSheet(),
+      builder: (_) => _input == ScanInput.barcode
+          ? const BarcodeSheet()
+          : const ScanResultsSheet(),
     );
   }
 
@@ -150,6 +154,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   @override
   Widget build(BuildContext context) {
     final session = ref.watch(scanSessionProvider);
+    final hits = ref.watch(barcodeSessionProvider);
+    final isShelf = _input == ScanInput.shelf;
+    final count = isShelf ? session.results.length : hits.length;
+
     ref.watch(
       shelfCaptureServiceProvider,
     ); // keep the OCR service alive while the screen is open
@@ -160,12 +168,12 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         behavior: HitTestBehavior.opaque,
         onVerticalDragEnd: (details) {
           final velocity = details.primaryVelocity ?? 0;
-          if (velocity < -200 && session.results.isNotEmpty) _showResults();
+          if (velocity < -200 && count > 0) _showResults();
         },
         child: Stack(
           children: [
             if (_input == ScanInput.barcode)
-              Positioned.fill(child: BarcodeScannerView(onIsbn: _onIsbn,))
+              Positioned.fill(child: BarcodeScannerView(onIsbn: _onIsbn))
             else
               ScannerCameraView(camera: _cameraFuture),
 
@@ -194,29 +202,30 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                   if (_mode == ScanMode.add)
                     ScanInputToggle(input: _input, onChanged: _setInput),
 
-                  if (_input == ScanInput.shelf) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        const Spacer(),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      const Spacer(),
+                      if (isShelf)
                         ShutterButton(
                           pending: session.pending,
                           maxPending: ScanSessionNotifier.maxPending,
                           onPressed: _captureShelf,
-                        ),
-                        Expanded(
-                          child: Center(
-                            child: ScanCountBadge(
-                              count: session.results.length,
-                              onTap: session.results.isEmpty
-                                  ? null
-                                  : _showResults,
-                            ),
+                        )
+                      else
+                        const SizedBox(
+                          width: 88,
+                        ), // same width as the shutter, keeps the badge in place
+                      Expanded(
+                        child: Center(
+                          child: ScanCountBadge(
+                            count: count,
+                            onTap: count == 0 ? null : _showResults,
                           ),
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
 
                   const SizedBox(height: 24),
                 ],

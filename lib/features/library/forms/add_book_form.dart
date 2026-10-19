@@ -39,11 +39,11 @@ class _AddBookFormState extends ConsumerState<AddBookForm> {
 
     final repository = ref.read(libraryRepositoryProvider);
 
+    final author = _optional(_authorController);
     final book = BookModel(
       title: _titleController.text.trim(),
-      author: _optional(_authorController),
+      authors: author == null ? const [] : [author],
       isbn: _optional(_isbnController)?.replaceAll('-', ''),
-      addedAt: DateTime.now(),
     );
 
     setState(() => _isSaving = true);

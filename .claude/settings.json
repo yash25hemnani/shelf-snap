@@ -28,10 +28,14 @@
       "PowerShell(git mv lib/core/models/book_result.dart lib/core/models/book_model.dart)",
       "PowerShell(flutter analyze)",
       "PowerShell(Remove-Item -Confirm:$false \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\\\\lib\\\\core\\\\network\\\\api_response.dart\"; if \\(\\(Get-ChildItem \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\\\\lib\\\\core\\\\network\" | Measure-Object\\).Count -eq 0\\) { Remove-Item -Confirm:$false \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\\\\lib\\\\core\\\\network\" }; git -C \"C:\\\\Users\\\\it\\\\StudioProjects\\\\shelf_snap\" status --short)",
-      "PowerShell(flutter analyze lib/features/home lib/features/scanner/screens)"
+      "PowerShell(flutter analyze lib/features/home lib/features/scanner/screens)",
+      "PowerShell(git rm -q lib/features/library/widgets/library_picker_sheet.dart)",
+      "PowerShell(flutter analyze lib)",
+      "PowerShell(flutter analyze lib/features/library)"
     ],
     "additionalDirectories": [
-      "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res"
+      "c:\\Users\\it\\StudioProjects\\shelf_snap\\android\\app\\src\\debug\\res",
+      "C:\\Users\\it\\StudioProjects\\shelf_snap\\test"
     ]
   }
 }
