@@ -42,21 +42,8 @@ class BookSearchService {
         : [];
 
     return booksJson
-        .whereType<Map>()
-        .where((b) => (b['title'] ?? '').toString().isNotEmpty)
-        .map(
-          (b) => BookModel(
-            title: b['title'].toString(),
-            author: b['author'] as String?,
-            isbn: b['isbn'] as String?,
-            coverUrl: b['coverUrl'] as String?,
-            description: b['description'] as String?,
-            publishedDate: b['publishedDate'] as String?,
-            pageCount: (b['pageCount'] as num?)?.toInt(),
-            // Search result, not saved yet — gets a fresh value when added
-            addedAt: DateTime.now(),
-          ),
-        )
+        .whereType<Map<String, dynamic>>()
+        .map(BookModel.fromApi)
         .toList();
   }
 }

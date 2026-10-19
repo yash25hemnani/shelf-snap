@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/dialogs/save_to_library_dialog.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
 import 'package:shelf_snap/features/search/providers/search_provider.dart';
@@ -20,6 +21,19 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _addBook(BookModel book) async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (_) => SaveToLibraryDialog(books: [book]),
+    );
+
+    if (saved != true || !mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text('Added "${book.title}"')));
   }
 
   @override
@@ -74,8 +88,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         MaterialPageRoute(
                           builder: (_) => BookDetailScreen(
                             book: book,
-                            onAdd: () {},
-                          ), // real action in the next step
+                            onAdd: () => _addBook(book),
+                          ),
                         ),
                       ),
                     );

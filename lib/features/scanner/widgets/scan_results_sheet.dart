@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/features/library/dialogs/save_to_library_dialog.dart';
 import 'package:shelf_snap/features/scanner/providers/scan_session_provider.dart';
 
 class ScanResultsSheet extends ConsumerWidget {
@@ -9,6 +10,21 @@ class ScanResultsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final results = ref.watch(scanSessionProvider).results;
 
+    Future<void> openSave() async {
+      final saved = await showDialog(
+        context: context,
+        builder: (_) =>
+            SaveToLibraryDialog(books: [for (final res in results) res.book]),
+      );
+
+      if (saved != true || !context.mounted) return;
+
+      ref.read(scanSessionProvider.notifier).removeAll(results);
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Saved ${results.length} books')));
+    }
+
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -16,9 +32,19 @@ class ScanResultsSheet extends ConsumerWidget {
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
-              '${results.length} books found',
-              style: Theme.of(context).textTheme.titleMedium,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${results.length} books found',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                FilledButton.tonal(
+                  onPressed: results.isEmpty ? null : openSave,
+                  child: const Text('Save'),
+                ),
+              ],
             ),
           ),
           if (results.isEmpty)
@@ -51,7 +77,7 @@ class ScanResultsSheet extends ConsumerWidget {
                         ref.read(scanSessionProvider.notifier).removeAt(i),
                     child: ListTile(
                       title: Text(r.book.title),
-                      subtitle: Text(r.book.author ?? 'Unknown author'),
+                      subtitle: Text(r.book.authorLine ?? 'Unknown author'),
                     ),
                   );
                 },

@@ -15,11 +15,15 @@ class ScanSessionNotifier extends AutoDisposeNotifier<ScanSession> {
     pending: state.pending - 1,
     results: [...state.results, ...results],
   );
-  
+
   void failProcessing() => state = state.copyWith(pending: state.pending - 1);
 
   void removeAt(int index) =>
       state = state.copyWith(results: [...state.results]..removeAt(index));
+
+  void removeAll(List<ScoredBookResult> saved) => state = state.copyWith(
+    results: state.results.where((r) => !saved.contains(r)).toList(),
+  );
 
   void reset() => state = const ScanSession();
 }

@@ -6,7 +6,8 @@ class LibraryModel {
   final String? description;
   final String? coverUrl;
   final String ownerId;
-  final int bookCount;
+  final int bookCount; // physical books, sum of noOfCopies
+  final int uniqueCount; // distinct editions, one per book doc
   final List<String> members;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -18,6 +19,7 @@ class LibraryModel {
     this.coverUrl,
     required this.ownerId,
     this.bookCount = 0,
+    this.uniqueCount = 0,
     this.members = const [],
     required this.createdAt,
     required this.updatedAt,
@@ -28,7 +30,8 @@ class LibraryModel {
     'description': description,
     'coverUrl': coverUrl,
     'ownerId': ownerId,
-    'bookCount': bookCount,  
+    'bookCount': bookCount,
+    'uniqueCount': uniqueCount,
     'members': members,
     'createdAt': Timestamp.fromDate(createdAt),
     'updatedAt': Timestamp.fromDate(updatedAt),
@@ -41,7 +44,8 @@ class LibraryModel {
       description: map['description'],
       coverUrl: map['coverUrl'],
       ownerId: map['ownerId'] ?? '',
-      bookCount: map['bookCount'] ?? 0,
+      bookCount: (map['bookCount'] as num?)?.toInt() ?? 0,
+      uniqueCount: (map['uniqueCount'] as num?)?.toInt() ?? 0,
       members: List<String>.from(map['members'] ?? []),
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),

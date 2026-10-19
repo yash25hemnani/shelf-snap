@@ -108,19 +108,10 @@ class BookIdentificationService {
           : [];
 
       return booksJson
-          .whereType<Map>()
-          .where((b) => (b['title'] ?? '').toString().isNotEmpty)
+          .whereType<Map<String, dynamic>>()
           .map(
             (b) => ScoredBookResult(
-              book: BookModel(
-                title: b['title'].toString(),
-                author: b['author'] as String?,
-                isbn: b['isbn'] as String?,
-                coverUrl: b['coverUrl'] as String?,
-                // A scan result, not yet saved to a library — addedAt gets
-                // a real value if/when the user actually adds it to one.
-                addedAt: DateTime.now(),
-              ),
+              book: BookModel.fromApi(b),
               score: (b['score'] as num?)?.toDouble() ?? 0,
             ),
           )

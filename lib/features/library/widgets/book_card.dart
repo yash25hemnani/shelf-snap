@@ -10,7 +10,7 @@ class BookCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final author = book.author;
+    final author = book.authorLine;
     final coverUrl = book.coverUrl;
 
     final placeholder = Container(

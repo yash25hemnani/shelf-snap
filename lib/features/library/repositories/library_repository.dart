@@ -27,16 +27,80 @@ class LibraryRepository {
         );
   }
 
-  // Add a book to the libray
+  // Find the doc for the same edition in a library, or null if there isn't one
+  Future<DocumentReference<Map<String, dynamic>>?> findBookInLibrary(
+    String libraryId,
+    BookModel book,
+  ) async {
+    if (book.isbn == null) return null;
+
+    final existingBook = await _db
+        .collection('libraries')
+        .doc(libraryId)
+        .collection('books')
+        .where('isbn', isEqualTo: book.isbn)
+        .limit(1)
+        .get();
+
+    return existingBook.docs.isEmpty ? null : existingBook.docs.first.reference;
+  }
+
+  // Add a book to the libray, or one more copy if the edition is already there
   Future<void> addBook(String libraryId, BookModel book) async {
     final libraryRef = _db.collection('libraries').doc(libraryId);
-    final bookRef = libraryRef
-        .collection('books')
-        .doc(); // new id, nothing written yet
+    final existingRef = await findBookInLibrary(libraryId, book);
 
     final batch = _db.batch();
-    batch.set(bookRef, book.toMap());
-    batch.update(libraryRef, {'bookCount': FieldValue.increment(1)});
+
+    if (existingRef != null) {
+      // Another copy of the same edition, uniqueCount stays the same
+      batch.update(existingRef, {'noOfCopies': FieldValue.increment(1)});
+      batch.update(libraryRef, {'bookCount': FieldValue.increment(1)});
+    } else {
+      final bookRef = libraryRef
+          .collection('books')
+          .doc(); // new id, nothing written yet
+
+      batch.set(bookRef, book.copyWith(libraryIds: [libraryId]).toMap());
+      batch.update(libraryRef, {
+        'bookCount': FieldValue.increment(1),
+        'uniqueCount': FieldValue.increment(1),
+      });
+    }
+
+    await batch.commit();
+  }
+
+  // Add multiple books to a library
+  Future<void> addBooks(String libraryId, List<BookModel> books) async {
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+    final batch = _db.batch();
+    final now = DateTime.now();
+
+    var unique = 0;
+
+    for (final book in books) {
+      // Check if book in library
+      final existingRef = await findBookInLibrary(libraryId, book);
+
+      if (existingRef != null) {
+        batch.update(existingRef, {'noOfCopies': FieldValue.increment(1)});
+        continue;
+      }
+
+      final bookRef = libraryRef.collection("books").doc();
+      batch.set(
+        bookRef,
+        book.copyWith(libraryIds: [libraryId], addedAt: now).toMap(),
+      );
+      unique++;
+    }
+
+    // Every book is one more physical copy, only new docs are new editions
+    batch.update(libraryRef, {
+      'bookCount': FieldValue.increment(books.length),
+      'uniqueCount': FieldValue.increment(unique),
+    });
 
     await batch.commit();
   }
@@ -60,16 +124,31 @@ class LibraryRepository {
     await _db.collection('libraries').doc(libraryId).delete();
   }
 
-  // Delete a book
+  // Remove one copy of a book, deleting the doc when it was the last copy
   Future<void> deleteBook(String libraryId, String bookId) async {
     final libraryRef = _db.collection('libraries').doc(libraryId);
-    final bookRef = libraryRef
-        .collection('books')
-        .doc(bookId);
+    final bookRef = libraryRef.collection('books').doc(bookId);
+
+    final snap = await bookRef.get();
+
+    if (!snap.exists) return;
+
+    final copies = (snap.data()?['noOfCopies'] as num?)?.toInt() ?? 1;
 
     final batch = _db.batch();
-    batch.delete(bookRef);
-    batch.update(libraryRef, {'bookCount': FieldValue.increment(-1)});
+
+    if (copies > 1) {
+      // If more than one book, just reduce counts
+      batch.update(bookRef, {'noOfCopies': FieldValue.increment(-1)});
+      batch.update(libraryRef, {'bookCount': FieldValue.increment(-1)});
+    } else {
+      // If a single book, delete it then update counts
+      batch.delete(bookRef);
+      batch.update(libraryRef, {
+        'bookCount': FieldValue.increment(-1),
+        'uniqueCount': FieldValue.increment(-1),
+      });
+    }
     await batch.commit();
   }
 }
