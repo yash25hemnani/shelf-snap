@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 
 class LibraryRepository {
@@ -61,7 +61,7 @@ class LibraryRepository {
           .collection('books')
           .doc(); // new id, nothing written yet
 
-      batch.set(bookRef, book.copyWith(libraryIds: [libraryId]).toMap());
+      batch.set(bookRef, book.toMap());
       batch.update(libraryRef, {
         'bookCount': FieldValue.increment(1),
         'uniqueCount': FieldValue.increment(1),
@@ -89,10 +89,7 @@ class LibraryRepository {
       }
 
       final bookRef = libraryRef.collection("books").doc();
-      batch.set(
-        bookRef,
-        book.copyWith(libraryIds: [libraryId], addedAt: now).toMap(),
-      );
+      batch.set(bookRef, book.copyWith(addedAt: now).toMap());
       unique++;
     }
 
@@ -105,7 +102,8 @@ class LibraryRepository {
     await batch.commit();
   }
 
-  // Watch books in a library
+  // Watch books in a library. Each book remembers this library, so it can
+  // be found again by its full path (libraries/{libraryId}/books/{id}).
   Stream<List<BookModel>> watchBooks(String libraryId) {
     return _db
         .collection('libraries')
@@ -114,7 +112,12 @@ class LibraryRepository {
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
-              .map((doc) => BookModel.fromMap(doc.id, doc.data()))
+              .map(
+                (doc) => BookModel.fromMap(
+                  doc.id,
+                  doc.data(),
+                ).copyWith(libraryId: libraryId),
+              )
               .toList(),
         );
   }
@@ -142,7 +145,7 @@ class LibraryRepository {
       batch.update(bookRef, {'noOfCopies': FieldValue.increment(-1)});
       batch.update(libraryRef, {'bookCount': FieldValue.increment(-1)});
     } else {
-      // If a single book, delete it then update counts
+      // If a single book, delete it then update countsfinal
       batch.delete(bookRef);
       batch.update(libraryRef, {
         'bookCount': FieldValue.increment(-1),

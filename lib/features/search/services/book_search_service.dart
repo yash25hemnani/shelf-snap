@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shelf_snap/core/config/api_config.dart';
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:http/http.dart' as http;
 
 class BookSearchService {

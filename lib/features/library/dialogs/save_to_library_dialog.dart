@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 

@@ -5,13 +5,12 @@ import 'package:diacritic/diacritic.dart';
 enum BookSource { google, openlibrary }
 
 /// One edition of a book. Mirrors the backend's `BookDetails`, plus the
-/// fields that only exist once the book is saved (id, readingId,
-/// libraryIds, addedAt, noOfCopies).
+/// fields that only exist once the book is saved (id, libraryId, addedAt,
+/// noOfCopies).
 class BookModel {
   // Null until the book is saved.
   final String? id;
-  final String? readingId; // shared by every edition of the same title
-  final List<String> libraryIds;
+  final String? libraryId; // from the doc path when loaded, never stored
   final DateTime? addedAt;
   final int noOfCopies; // physical copies of this edition
 
@@ -41,8 +40,7 @@ class BookModel {
 
   const BookModel({
     this.id,
-    this.readingId,
-    this.libraryIds = const [],
+    this.libraryId,
     this.addedAt,
     this.noOfCopies = 1,
     this.googleBooksId,
@@ -83,15 +81,11 @@ class BookModel {
   factory BookModel.fromMap(String id, Map<String, dynamic> map) =>
       BookModel.fromApi(map).copyWith(
         id: id,
-        readingId: map['readingId'] as String?,
-        libraryIds: (map['libraryIds'] as List?)?.cast<String>(),
         addedAt: (map['addedAt'] as Timestamp?)?.toDate(),
         noOfCopies: (map['noOfCopies'] as num?)?.toInt(),
       );
 
   Map<String, dynamic> toMap() => {
-    'readingId': readingId,
-    'libraryIds': libraryIds,
     'addedAt': Timestamp.fromDate(addedAt ?? DateTime.now()),
     'noOfCopies': noOfCopies,
     'googleBooksId': googleBooksId,
@@ -113,14 +107,12 @@ class BookModel {
   /// Only our own fields change; the book facts come from the provider.
   BookModel copyWith({
     String? id,
-    String? readingId,
-    List<String>? libraryIds,
+    String? libraryId,
     DateTime? addedAt,
     int? noOfCopies,
   }) => BookModel(
     id: id ?? this.id,
-    readingId: readingId ?? this.readingId,
-    libraryIds: libraryIds ?? this.libraryIds,
+    libraryId: libraryId ?? this.libraryId,
     addedAt: addedAt ?? this.addedAt,
     noOfCopies: noOfCopies ?? this.noOfCopies,
     googleBooksId: googleBooksId,
@@ -142,22 +134,10 @@ class BookModel {
   /// "A, B" for display; null when there are no authors.
   String? get authorLine => authors.isEmpty ? null : authors.join(', ');
 
-  /// Default reading log id: "title_firstauthor", shared by every edition.
-  /// Null when the title or the first author is missing.
-  String? get readingKey {
-    if (title == unknownTitle || authors.isEmpty) return null;
+  @override
+  String toString() =>
+      'BookModel(id: $id, title: "$title", authors: $authors, isbn: $isbn)';
 
-    final titlePart = normalize(title);
-    final authorPart = normalize(authors.first);
-    if (titlePart.isEmpty || authorPart.isEmpty) return null;
-
-    return '${titlePart}_$authorPart';
-  }
-
-  /// Squishes a title or author into a matching key part:
-  /// "The Hobbit (Penguin Classics)" → "hobbit".
-  /// Text after a colon is kept on purpose: it often tells books in a
-  /// series apart ("Percy Jackson & the Olympians: The Lightning Thief").
   static String normalize(String s) {
     var out = removeDiacritics(s.toLowerCase()); // "Misérables" → "miserables"
 
@@ -174,8 +154,13 @@ class BookModel {
     ); // letters, marks, digits only
   }
 
-  @override
-  String toString() =>
-      'BookModel(id: $id, readingId: $readingId, title: "$title", '
-      'authors: $authors, isbn: $isbn)';
+  String? get readingKey {
+    if (title == unknownTitle || authors.isEmpty) return null;
+
+    final titlePart = normalize(title);
+    final authorPart = normalize(authors.first);
+    if (titlePart.isEmpty || authorPart.isEmpty) return null;
+
+    return '${titlePart}_$authorPart';
+  }
 }

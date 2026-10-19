@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/dialogs/save_to_library_dialog.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';

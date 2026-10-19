@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf_snap/core/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/scanner/models/barcode_hit.dart';
 
 class BarcodeSessionNotifier
