@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/theme/app_theme.dart';
 import 'package:shelf_snap/firebase_options.dart';
 import 'package:shelf_snap/features/auth/screens/auth_gate.dart';
 
@@ -24,12 +25,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'ShelfSnap',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        brightness: Brightness.dark,
-        useMaterial3: true,
-      ),
-      themeMode: ThemeMode.dark,
+      theme: AppTheme.light,
       home: const AuthGate(),
       debugShowCheckedModeBanner: false,
     );

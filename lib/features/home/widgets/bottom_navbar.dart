@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/home/models/nav_item_model.dart';
 
 class BottomNavbar extends StatelessWidget {
@@ -20,6 +21,11 @@ class BottomNavbar extends StatelessWidget {
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: AppColors.border),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -70,7 +76,7 @@ class _CenterNavItem extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.primary.withOpacity(0.4),
+              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -78,7 +84,7 @@ class _CenterNavItem extends StatelessWidget {
         ),
         child: Icon(
           icon,
-          color: Colors.white,
+          color: Theme.of(context).colorScheme.onPrimary,
           size: 28,
         ),
       ),
@@ -86,7 +92,7 @@ class _CenterNavItem extends StatelessWidget {
   }
 }
 
-// Regular nav items with white ripple on tap
+// Regular nav items with a soft green ripple on tap
 class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.icon,
@@ -106,13 +112,13 @@ class _NavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected
         ? Theme.of(context).colorScheme.primary
-        : Colors.grey;
+        : AppColors.textSecondary;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
-      splashColor: Colors.white.withOpacity(0.3),   // white ripple
-      highlightColor: Colors.white.withOpacity(0.1),
+      splashColor: AppColors.primarySoft,
+      highlightColor: AppColors.primarySoft.withValues(alpha: 0.5),
       child: SizedBox(
         width: 72,
         height: 54,

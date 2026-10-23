@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shelf_snap/features/library/dialogs/add_book_dialog.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
+import 'package:shelf_snap/features/library/sheets/add_book_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
 
 class LibraryDetailScreen extends ConsumerWidget {
@@ -18,10 +18,7 @@ class LibraryDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(library.name)),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => AddBookDialog(libraryId: library.id!),
-        ),
+        onPressed: () => AddBookSheet.show(context, libraryId: library.id!),
         child: const Icon(Icons.add),
       ),
 

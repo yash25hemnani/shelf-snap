@@ -67,10 +67,10 @@ class ScanResultsSheet extends ConsumerWidget {
                     background: Container(
                       alignment: Alignment.centerRight,
                       padding: const EdgeInsets.only(right: 20),
-                      color: Colors.red[900],
-                      child: const Icon(
+                      color: Theme.of(context).colorScheme.error,
+                      child: Icon(
                         Icons.delete_outline,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onError,
                       ),
                     ),
                     onDismissed: (_) =>
