@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
-import 'package:shelf_snap/features/library/dialogs/create_library_dialog.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/library_detail_screen.dart';
+import 'package:shelf_snap/features/library/sheets/create_library_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/library_card.dart';
 
 class LibraryScreen extends ConsumerStatefulWidget {
@@ -26,9 +26,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final librariesAsync = ref.watch(userLibrariesProvider(userId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Libraries")),
+      appBar: AppBar(
+        toolbarHeight: 80,
+        titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+        title: const Text("Libraries"),
+      ),
       body: librariesAsync.when(
         data: (items) => ListView.builder(
+          // Extra bottom space so the FAB doesn't cover the last card
+          padding: const EdgeInsets.only(top: 8, bottom: 88),
           itemCount: items.length,
           itemBuilder: (context, index) {
             final library = items[index];
@@ -47,10 +53,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => showDialog(
-          context: context,
-          builder: (_) => CreateLibraryDialog(userId: userId),
-        ),
+        onPressed: () => CreateLibrarySheet.show(context, userId: userId),
         child: const Icon(Icons.add),
       ),
     );

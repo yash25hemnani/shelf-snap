@@ -41,7 +41,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     final resultsAsync = ref.watch(searchResultsProvider(_query));
 
     return Scaffold(
-      appBar: AppBar(title: const Text("Search")),
+      appBar: AppBar(
+        toolbarHeight: 80,
+        titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+        title: const Text("Search"),
+      ),
       body: Column(
         children: [
           Padding(

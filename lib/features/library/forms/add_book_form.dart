@@ -106,25 +106,15 @@ class _AddBookFormState extends ConsumerState<AddBookForm> {
               },
             ),
             const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: _isSaving ? null : () => Navigator.pop(context),
-                  child: const Text("Cancel"),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: _isSaving ? null : _onSubmit,
-                  child: _isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text("Add"),
-                ),
-              ],
+            FilledButton(
+              onPressed: _isSaving ? null : _onSubmit,
+              child: _isSaving
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text("Add book"),
             ),
           ],
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shelf_snap/features/home/models/nav_item_model.dart';
 import 'package:shelf_snap/features/library/screens/library_screen.dart';
+import 'package:shelf_snap/features/profile/screens/profile_screen.dart';
 import 'package:shelf_snap/features/scanner/screens/scanner_screen.dart';
 import 'package:shelf_snap/features/home/widgets/bottom_navbar.dart';
 import 'package:shelf_snap/features/search/screens/search_screen.dart';
@@ -48,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
       label: "Library",
     ),
     NavItemModel(
-      page: const Center(child: Text("Profile")),
+      page: const ProfileScreen(),
       icon: Icons.person_outline,
       activeIcon: Icons.person,
       label: "Profile",
