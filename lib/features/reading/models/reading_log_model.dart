@@ -3,6 +3,16 @@ import 'package:shelf_snap/features/library/models/book_model.dart';
 
 enum BookStatus { wantToRead, reading, paused, finished, dnf }
 
+extension BookStatusLabel on BookStatus {
+  String get label => switch (this) {
+    BookStatus.wantToRead => 'Want to read',
+    BookStatus.reading => 'Reading',
+    BookStatus.paused => 'Paused',
+    BookStatus.finished => 'Finished',
+    BookStatus.dnf => 'Did not finish',
+  };
+}
+
 class PastRead {
   final DateTime startedAt;
   final DateTime endedAt;

@@ -27,14 +27,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 64,
         titleTextStyle: Theme.of(context).textTheme.headlineMedium,
         title: const Text("Libraries"),
       ),
       body: librariesAsync.when(
         data: (items) => ListView.builder(
           // Extra bottom space so the FAB doesn't cover the last card
-          padding: const EdgeInsets.only(top: 8, bottom: 88),
+          padding: const EdgeInsets.only(bottom: 88),
           itemCount: items.length,
           itemBuilder: (context, index) {
             final library = items[index];

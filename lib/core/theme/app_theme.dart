@@ -73,7 +73,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
-        toolbarHeight: 72,
+        toolbarHeight: 60,
         titleTextStyle: textTheme.headlineSmall,
       ),
 

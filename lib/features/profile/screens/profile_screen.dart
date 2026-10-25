@@ -56,13 +56,13 @@ class ProfileScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 64,
         titleTextStyle: theme.textTheme.headlineMedium,
         title: const Text('Profile'),
       ),
       body: ListView(
         // Extra bottom space so the last item clears the navbar
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         children: [
           Center(
             child: CircleAvatar(

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
-import 'package:shelf_snap/features/library/dialogs/save_to_library_dialog.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
+import 'package:shelf_snap/features/library/sheets/save_to_library_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
 import 'package:shelf_snap/features/search/providers/search_provider.dart';
 
@@ -24,10 +24,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _addBook(BookModel book) async {
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (_) => SaveToLibraryDialog(books: [book]),
-    );
+    final saved = await SaveToLibrarySheet.show(context, book: book);
 
     if (saved != true || !mounted) return;
 
@@ -42,14 +39,14 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 64,
         titleTextStyle: Theme.of(context).textTheme.headlineMedium,
         title: const Text("Search"),
       ),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsetsGeometry.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: TextField(
               controller: _controller,
               textInputAction: TextInputAction.search,
