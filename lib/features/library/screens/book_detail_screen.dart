@@ -1,19 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
+import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
 
-class BookDetailScreen extends StatefulWidget {
+class BookDetailScreen extends ConsumerStatefulWidget {
   final BookModel book;
   final VoidCallback? onAdd; // null = hide the button
   const BookDetailScreen({super.key, required this.book, this.onAdd});
 
   @override
-  State<BookDetailScreen> createState() => _BookDetailScreenState();
+  ConsumerState<BookDetailScreen> createState() => _BookDetailScreenState();
 }
 
-class _BookDetailScreenState extends State<BookDetailScreen> {
-  BookStatus? _status; // null until the user picks one
+class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
+  // The log stream shows the new status as soon as it's written locally
+  Future<void> _onStatusChanged(BookStatus status) async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .updateBookStatus(status, widget.book, userId);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not update status: $e')));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +50,11 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
       ),
     );
 
+    // Books without a title or author have no key, so they can't be tracked
+    final readingKey = widget.book.readingKey;
+    final status = readingKey == null
+        ? null
+        : ref.watch(readingLogProvider(readingKey)).valueOrNull?.status;
 
     return Scaffold(
       appBar: AppBar(),
@@ -103,12 +126,8 @@ class _BookDetailScreenState extends State<BookDetailScreen> {
             ),
             const SizedBox(height: 16),
             StatusDropdown(
-              value: _status,
-              onChanged: (status) {
-                setState(() {
-                  _status = status;
-                });
-              },
+              value: status,
+              onChanged: readingKey == null ? null : _onStatusChanged,
             ),
 
             if (widget.book.categories.isNotEmpty) ...[

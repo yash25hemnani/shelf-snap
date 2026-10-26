@@ -55,4 +55,19 @@ class ReadingLogRepository {
       'updatedAt': Timestamp.now(),
     });
   }
+
+  Stream<ReadingLogModel?> watchLog(String userId, String readingKey) {
+    return _db
+        .collection('users')
+        .doc(userId)
+        .collection('readingLogs')
+        .where('readingId', isEqualTo: readingKey)
+        .limit(1)
+        .snapshots()
+        .map((snap) {
+          if (snap.docs.isEmpty) return null;
+          final doc = snap.docs.first;
+          return ReadingLogModel.fromMap(doc.id, doc.data());
+        });
+  }
 }
