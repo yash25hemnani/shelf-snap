@@ -118,8 +118,8 @@ class AppTheme {
         contentTextStyle: textTheme.bodyMedium?.copyWith(
           color: AppColors.onPrimary,
         ),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        // Full width, attached to the bottom edge of the screen
+        behavior: SnackBarBehavior.fixed,
       ),
 
       progressIndicatorTheme: const ProgressIndicatorThemeData(
@@ -162,6 +162,16 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: AppColors.onPrimary,
           elevation: 0,
+          minimumSize: const Size(64, 52),
+          shape: const StadiumBorder(),
+          textStyle: textTheme.titleMedium,
+        ),
+      ),
+
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: const BorderSide(color: AppColors.border),
           minimumSize: const Size(64, 52),
           shape: const StadiumBorder(),
           textStyle: textTheme.titleMedium,
