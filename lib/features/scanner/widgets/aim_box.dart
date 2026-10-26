@@ -1,36 +1,36 @@
 import 'package:flutter/material.dart';
 
 /// Dims the preview outside [window] and outlines it, so the user knows
-/// where to hold the barcode.
+/// where to hold the barcode. [borderColor] lets the outline flash on a scan.
 class AimBox extends StatelessWidget {
   final Rect window;
+  final Color borderColor;
 
-  const AimBox({super.key, required this.window});
+  const AimBox({
+    super.key,
+    required this.window,
+    this.borderColor = Colors.white,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Positioned.fill(child: CustomPaint(painter: _AimBoxPainter(window))),
-        Positioned(
-          left: 0,
-          right: 0,
-          top: window.bottom + 16,
-          child: const Text(
-            'Point at the barcode on the back cover',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white70),
-          ),
+    return Positioned.fill(
+      child: TweenAnimationBuilder<Color?>(
+        tween: ColorTween(end: borderColor),
+        duration: const Duration(milliseconds: 150),
+        builder: (context, color, _) => CustomPaint(
+          painter: _AimBoxPainter(window, color ?? borderColor),
         ),
-      ],
+      ),
     );
   }
 }
 
 class _AimBoxPainter extends CustomPainter {
   final Rect window;
+  final Color borderColor;
 
-  _AimBoxPainter(this.window);
+  _AimBoxPainter(this.window, this.borderColor);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -46,11 +46,12 @@ class _AimBoxPainter extends CustomPainter {
       hole,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..color = Colors.white,
+        ..strokeWidth = 3
+        ..color = borderColor,
     );
   }
 
   @override
-  bool shouldRepaint(_AimBoxPainter old) => old.window != window;
+  bool shouldRepaint(_AimBoxPainter old) =>
+      old.window != window || old.borderColor != borderColor;
 }

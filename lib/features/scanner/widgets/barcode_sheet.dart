@@ -136,6 +136,11 @@ class _HitTile extends StatelessWidget {
         title: const Text('Not found'),
         subtitle: Text(hit.isbn),
       ),
+      HitStatus.failed => ListTile(
+        leading: const Icon(Icons.error_outline),
+        title: const Text('Lookup failed, scan it again'),
+        subtitle: Text(hit.isbn),
+      ),
     };
   }
 }

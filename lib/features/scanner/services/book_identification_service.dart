@@ -19,8 +19,9 @@ class BookIdentificationService {
   final _baseUrl = ApiConfig.baseUrl;
 
   // Long edge of the uploaded image. Large enough for spine text to stay
-  // legible, small enough to keep the upload a few hundred KB.
-  static const int _maxImageEdge = 1600;
+  // legible, small enough to keep Groq's image tokens (8,000 per minute
+  // on the current plan) low.
+  static const int _maxImageEdge = 1200;
   static const int _jpegQuality = 80;
 
   /// Identifies the books in the photo at [imagePath]. [blocks] are raw OCR
@@ -42,6 +43,7 @@ class BookIdentificationService {
 
     // Downscale + re-encode; also applies EXIF rotation so the model sees
     // the photo upright.
+    final compressWatch = Stopwatch()..start();
     final Uint8List? imageBytes;
     try {
       imageBytes = await FlutterImageCompress.compressWithFile(
@@ -59,6 +61,10 @@ class BookIdentificationService {
       debugPrint('[Identify] Image compression failed, skipping request');
       return [];
     }
+    debugPrint(
+      '[Identify] Compressed to ${imageBytes.length ~/ 1024} KB'
+      ' in ${compressWatch.elapsedMilliseconds} ms',
+    );
 
     final payload = {
       'image': base64Encode(imageBytes),
@@ -80,9 +86,11 @@ class BookIdentificationService {
 
     final uri = Uri.parse('$_baseUrl/identify-books');
     debugPrint(
-      '[Identify] POST $uri (image ${imageBytes.length ~/ 1024} KB)',
+      '[Identify] POST $uri (${blocks.length} OCR blocks, '
+      '${imageWidth}x$imageHeight)',
     );
 
+    final requestWatch = Stopwatch()..start();
     try {
       final response = await http
           .post(
@@ -95,11 +103,14 @@ class BookIdentificationService {
           )
           .timeout(const Duration(seconds: 60));
 
+      final elapsed = requestWatch.elapsedMilliseconds;
       if (response.statusCode != 200) {
-        debugPrint('[Identify] Failed ${response.statusCode}: ${response.body}');
+        debugPrint(
+          '[Identify] Failed ${response.statusCode} after $elapsed ms: '
+          '${response.body}',
+        );
         return [];
       }
-      debugPrint('[Identify] OK ${response.statusCode}');
 
       final decoded = jsonDecode(response.body);
       final List<dynamic> booksJson =
@@ -107,7 +118,7 @@ class BookIdentificationService {
           ? decoded['books'] as List<dynamic>
           : [];
 
-      return booksJson
+      final results = booksJson
           .whereType<Map<String, dynamic>>()
           .map(
             (b) => ScoredBookResult(
@@ -116,8 +127,22 @@ class BookIdentificationService {
             ),
           )
           .toList();
+
+      debugPrint(
+        '[Identify] OK in $elapsed ms, ${results.length} books matched',
+      );
+      for (final r in results) {
+        debugPrint(
+          '[Identify]   ${r.score.toStringAsFixed(2)}  "${r.book.title}"'
+          ' by ${r.book.authorLine ?? '?'} (isbn ${r.book.isbn ?? '-'})',
+        );
+      }
+      return results;
     } catch (e) {
-      debugPrint('[Identify] Request failed: $e');
+      debugPrint(
+        '[Identify] Request failed after '
+        '${requestWatch.elapsedMilliseconds} ms: $e',
+      );
       return [];
     }
   }

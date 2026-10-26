@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/library/dialogs/save_to_library_dialog.dart';
 import 'package:shelf_snap/features/scanner/providers/scan_session_provider.dart';
 
@@ -76,6 +77,7 @@ class ScanResultsSheet extends ConsumerWidget {
                     onDismissed: (_) =>
                         ref.read(scanSessionProvider.notifier).removeAt(i),
                     child: ListTile(
+                      leading: _Cover(url: r.book.coverUrl),
                       title: Text(r.book.title),
                       subtitle: Text(r.book.authorLine ?? 'Unknown author'),
                     ),
@@ -85,6 +87,42 @@ class ScanResultsSheet extends ConsumerWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// Small book cover, with a placeholder while loading or when there's none
+class _Cover extends StatelessWidget {
+  final String? url;
+
+  const _Cover({this.url});
+
+  static const _width = 40.0;
+  static const _height = 60.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final placeholder = Container(
+      width: _width,
+      height: _height,
+      color: AppColors.surfaceMuted,
+      child: const Icon(Icons.menu_book_rounded, color: AppColors.hint),
+    );
+    final coverUrl = url;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: coverUrl == null
+          ? placeholder
+          : Image.network(
+              coverUrl,
+              width: _width,
+              height: _height,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, progress) =>
+                  progress == null ? child : placeholder,
+              errorBuilder: (_, _, _) => placeholder,
+            ),
     );
   }
 }

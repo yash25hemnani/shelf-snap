@@ -7,13 +7,23 @@ class BarcodeSessionNotifier
   @override
   Map<String, BarcodeHit> build() => const {};
 
-  // Returns false if the ISBN is already in the session
+  // Returns false if the ISBN is already in the session. A failed lookup
+  // can be added again, which retries it.
   bool add(String isbn) {
-    if (state.containsKey(isbn)) return false;
+    final existing = state[isbn];
+    if (existing != null && existing.status != HitStatus.failed) return false;
 
-    state = {...state, isbn: BarcodeHit(isbn: isbn)};
+    // Removed first so a retry moves to the end, as the newest scan
+    state = {...state}
+      ..remove(isbn)
+      ..[isbn] = BarcodeHit(isbn: isbn);
     return true;
   }
+
+  void fail(String isbn) => state = {
+    ...state,
+    isbn: BarcodeHit(isbn: isbn, status: HitStatus.failed),
+  };
 
   void resolve(String isbn, BookModel? book) => state = {
     ...state,

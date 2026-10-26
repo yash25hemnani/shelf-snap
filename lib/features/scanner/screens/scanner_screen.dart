@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shelf_snap/features/scanner/models/scan_mode.dart';
@@ -61,20 +62,33 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final notifier = ref.read(barcodeSessionProvider.notifier);
 
     if (!notifier.add(isbn)) {
-      debugPrint('[Barcode] duplicate: $isbn');
+      debugPrint('[Barcode] $isbn already in session, ignored');
+      HapticFeedback.lightImpact(); // already in this session
       return;
     }
 
-    debugPrint('[Barcode] new: $isbn, looking up...');
+    HapticFeedback.mediumImpact(); // new barcode
+    debugPrint('[Barcode] $isbn scanned, looking up');
+    final watch = Stopwatch()..start();
 
     try {
       final book = await ref.read(bookSearchServiceProvider).lookupIsbn(isbn);
+      debugPrint(
+        book == null
+            ? '[Barcode] $isbn no match (${watch.elapsedMilliseconds} ms)'
+            : '[Barcode] $isbn -> "${book.title}" '
+                  '(${watch.elapsedMilliseconds} ms)',
+      );
       if (!mounted) return;
+      if (book == null) HapticFeedback.heavyImpact(); // no match for the ISBN
       notifier.resolve(isbn, book);
     } catch (e) {
+      debugPrint(
+        '[Barcode] $isbn lookup failed (${watch.elapsedMilliseconds} ms): $e',
+      );
       if (!mounted) return;
-      notifier.remove(isbn); // let a rescan try again
-      debugPrint('[Barcode] lookup failed for $isbn: $e');
+      notifier.fail(isbn); // shown in the feed; a rescan retries it
+      HapticFeedback.heavyImpact();
     }
   }
 
@@ -113,20 +127,34 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     final notifier = ref.read(scanSessionProvider.notifier);
 
-    if (ref.read(scanSessionProvider).pending >= ScanSessionNotifier.maxPending)
+    if (ref.read(scanSessionProvider).pending >=
+        ScanSessionNotifier.maxPending) {
+      debugPrint('[Scan] Shutter ignored, too many captures in flight');
       return;
+    }
 
     notifier.startProcessing();
+    final watch = Stopwatch()..start();
+    debugPrint('[Scan] Capture started');
 
     try {
       final photo = await controller.takePicture();
+      debugPrint('[Scan] Photo taken in ${watch.elapsedMilliseconds} ms');
+
       final results = await ref
           .read(shelfCaptureServiceProvider)
           .identify(photo.path, controller.value.previewSize!);
 
+      debugPrint(
+        '[Scan] Capture done in ${watch.elapsedMilliseconds} ms, '
+        '${results.length} books',
+      );
       if (!mounted) return;
       notifier.addResults(results);
     } catch (e) {
+      debugPrint(
+        '[Scan] Capture failed after ${watch.elapsedMilliseconds} ms: $e',
+      );
       if (!mounted) return;
       notifier.failProcessing();
       ScaffoldMessenger.of(

@@ -11,9 +11,17 @@ class ShelfCaptureService {
     String photoPath,
     Size previewSize,
   ) async {
+    final ocrWatch = Stopwatch()..start();
     final ocr = await _recognizer.processImage(
       InputImage.fromFilePath(photoPath),
     );
+    debugPrint(
+      '[OCR] ${ocr.blocks.length} blocks in ${ocrWatch.elapsedMilliseconds} ms'
+      ' (preview ${previewSize.width.round()}x${previewSize.height.round()})',
+    );
+    for (final block in ocr.blocks) {
+      debugPrint('[OCR]   "${block.text.replaceAll('\n', ' ')}"');
+    }
 
     // previewSize is landscape on Android, so swap for portrait
     return _identifier.identifyBooks(
