@@ -14,6 +14,16 @@ class LibraryRepository {
     return doc.id;
   }
 
+  // Only the fields the edit form changes, so counts and members are untouched
+  Future<void> updateLibrary(LibraryModel library) {
+    return _db.collection('libraries').doc(library.id).update({
+      'name': library.name,
+      'description': library.description,
+      'banner': library.banner,
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
   // Stream and watch all libraries for a user
   Stream<List<LibraryModel>> watchUserLibraries(String userId) {
     return _db

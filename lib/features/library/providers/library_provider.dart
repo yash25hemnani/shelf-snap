@@ -7,10 +7,12 @@ final libraryRepositoryProvider = Provider((ref) => LibraryRepository());
 
 // All libraries for a user
 final userLibrariesProvider = StreamProvider.family<List<LibraryModel>, String>(
-      (ref, userId) => ref.watch(libraryRepositoryProvider).watchUserLibraries(userId),
+  (ref, userId) =>
+      ref.watch(libraryRepositoryProvider).watchUserLibraries(userId),
 );
 
 // Books inside a specific library
 final libraryBooksProvider = StreamProvider.family<List<BookModel>, String>(
-      (ref, libraryId) => ref.watch(libraryRepositoryProvider).watchBooks(libraryId),
+  (ref, libraryId) =>
+      ref.watch(libraryRepositoryProvider).watchBooks(libraryId),
 );

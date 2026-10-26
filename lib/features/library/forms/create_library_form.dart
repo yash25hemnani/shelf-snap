@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 
 class CreateLibraryForm extends ConsumerStatefulWidget {
   final String userId;
-  const CreateLibraryForm({super.key, required this.userId});
+  final LibraryModel? library; // set = editing this library
+  const CreateLibraryForm({super.key, required this.userId, this.library});
 
   @override
   ConsumerState<CreateLibraryForm> createState() => _CreateLibraryFormState();
@@ -19,6 +21,22 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
 
   // True while the save is in progress; disables the button
   bool _isSaving = false;
+
+  String _banner = AppColors.defaultBanner; // key in AppColors.libraryBanners
+
+  bool get _isEditing => widget.library != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final library = widget.library;
+
+    if (library != null) {
+      _nameController.text = library.name;
+      _descController.text = library.description ?? '';
+      _banner = library.banner;
+    }
+  }
 
   @override
   void dispose() {
@@ -40,6 +58,7 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
       name: name,
       description: desc.isEmpty ? null : desc,
       ownerId: widget.userId,
+      banner: _banner,
       createdAt: now,
       updatedAt: now,
     );
@@ -47,7 +66,21 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
     setState(() => _isSaving = true);
 
     try {
-      await repository.createLibrary(library);
+      if (_isEditing) {
+        await repository.updateLibrary(
+          LibraryModel(
+            id: widget.library!.id,
+            name: name,
+            description: desc.isEmpty ? null : desc,
+            ownerId: widget.library!.ownerId,
+            banner: _banner,
+            createdAt: widget.library!.createdAt,
+            updatedAt: DateTime.now(),
+          ),
+        );
+      } else {
+        await repository.createLibrary(library);
+      }
 
       // The user may have left while we were waiting
       if (!mounted) return;
@@ -70,8 +103,52 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text("New library", style: Theme.of(context).textTheme.titleLarge),
+            Text(_isEditing ? "Edit Library" 
+                            :  "New library", style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
+
+            // Preview of the banner the library will get
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 88,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: AppColors.libraryBanners[_banner]!,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final entry in AppColors.libraryBanners.entries)
+                  GestureDetector(
+                    onTap: () => setState(() => _banner = entry.key),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 150),
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(colors: entry.value),
+                        // Ring around the selected gradient
+                        border: Border.all(
+                          color: entry.key == _banner
+                              ? AppColors.text
+                              : AppColors.background,
+                          width: 2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
             TextFormField(
               controller: _nameController,
               autofocus: true,
@@ -86,6 +163,9 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
             const SizedBox(height: 12),
             TextFormField(
               controller: _descController,
+              maxLength: 200,
+              minLines: 1,
+              maxLines: 3,
               decoration: const InputDecoration(
                 labelText: "Description (optional)",
               ),

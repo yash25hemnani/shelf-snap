@@ -72,7 +72,8 @@ class LibraryCard extends StatelessWidget {
                       children: [
                         _Stat(
                           icon: Icons.menu_book_rounded,
-                          label: '$bookCount ${bookCount == 1 ? 'book' : 'books'}',
+                          label:
+                              '$bookCount ${bookCount == 1 ? 'book' : 'books'}',
                         ),
                         const SizedBox(width: 14),
                         _Stat(
@@ -109,9 +110,9 @@ class _Stat extends StatelessWidget {
         const SizedBox(width: 4),
         Text(
           label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: AppColors.textSecondary,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.labelSmall?.copyWith(color: AppColors.textSecondary),
         ),
       ],
     );

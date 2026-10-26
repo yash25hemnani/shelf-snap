@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
@@ -16,6 +18,47 @@ class BookDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
+  bool _removing = false;
+
+  // Removes one copy, or the whole book when it's the last copy
+  Future<void> _remove() async {
+    final book = widget.book;
+    final libraryId = book.libraryId;
+    final bookId = book.id;
+    if (libraryId == null || bookId == null || _removing) return;
+
+    setState(() => _removing = true);
+    try {
+      await ref.read(libraryRepositoryProvider).deleteBook(libraryId, bookId);
+      if (!mounted) return;
+
+      // Shown before popping; the app-wide messenger keeps it on screen
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              book.noOfCopies > 1
+                  ? 'Removed one copy of ${book.title}'
+                  : 'Removed ${book.title} from library',
+            ),
+          ),
+        );
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _removing = false);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: const Text("Couldn't remove book, check your connection"),
+            backgroundColor: AppColors.error,
+          ),
+        );
+    }
+  }
+
   // The log stream shows the new status as soon as it's written locally
   Future<void> _onStatusChanged(BookStatus status) async {
     final userId = AuthService().currentUser?.uid;
@@ -57,7 +100,17 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         : ref.watch(readingLogProvider(readingKey)).valueOrNull?.status;
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        actions: [
+          // Only saved books opened from a library can be removed
+          if (widget.book.id != null && widget.book.libraryId != null)
+            IconButton(
+              tooltip: 'Remove from library',
+              icon: const Icon(Icons.delete_outline_rounded),
+              onPressed: _removing ? null : _remove,
+            ),
+        ],
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

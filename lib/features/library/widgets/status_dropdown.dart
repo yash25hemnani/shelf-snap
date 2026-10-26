@@ -66,7 +66,9 @@ class _StatusPill extends StatelessWidget {
       decoration: BoxDecoration(
         color: active ? AppColors.primarySoft : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: active ? AppColors.primary : AppColors.border),
+        border: Border.all(
+          color: active ? AppColors.primary : AppColors.border,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min, // hug the text, don't stretch

@@ -18,8 +18,7 @@ class SaveToLibrarySheet extends ConsumerStatefulWidget {
   }
 
   @override
-  ConsumerState<SaveToLibrarySheet> createState() =>
-      _SaveToLibrarySheetState();
+  ConsumerState<SaveToLibrarySheet> createState() => _SaveToLibrarySheetState();
 }
 
 class _SaveToLibrarySheetState extends ConsumerState<SaveToLibrarySheet> {

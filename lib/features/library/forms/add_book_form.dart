@@ -55,8 +55,9 @@ class _AddBookFormState extends ConsumerState<AddBookForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Could not add book: $e")));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Could not add book: $e")));
     }
   }
 
