@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/invites/sheets/invite_sheet.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
-import 'package:shelf_snap/features/library/sheets/add_book_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
 
 class LibraryDetailScreen extends ConsumerWidget {
@@ -14,14 +15,21 @@ class LibraryDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final booksAsync = ref.watch(libraryBooksProvider(library.id!));
+    final isOwner = library.ownerId == AuthService().currentUser?.uid;
 
     return Scaffold(
-      appBar: AppBar(title: Text(library.name)),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => AddBookSheet.show(context, libraryId: library.id!),
-        child: const Icon(Icons.add),
+      appBar: AppBar(
+        title: Text(library.name),
+        actions: [
+          // Only the owner can invite people
+          if (isOwner)
+            IconButton(
+              tooltip: 'Invite',
+              icon: const Icon(Icons.person_add_alt_1_rounded),
+              onPressed: () => InviteSheet.show(context, library),
+            ),
+        ],
       ),
-
       body: booksAsync.when(
         data: (books) {
           if (books.isEmpty) {
@@ -31,8 +39,7 @@ class LibraryDetailScreen extends ConsumerWidget {
           }
 
           return GridView.builder(
-            // Extra bottom space so the FAB doesn't cover the last row
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+            padding: const EdgeInsets.all(16),
             gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
               maxCrossAxisExtent: 130,
               mainAxisExtent: 210,

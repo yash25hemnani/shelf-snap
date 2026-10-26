@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/invites/providers/invite_provider.dart';
+import 'package:shelf_snap/features/invites/screens/notifications_screen.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/library_detail_screen.dart';
 import 'package:shelf_snap/features/library/sheets/create_library_sheet.dart';
@@ -24,12 +26,29 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
 
     final librariesAsync = ref.watch(userLibrariesProvider(userId));
+    final inviteCount =
+        ref.watch(incomingInvitesProvider(userId)).valueOrNull?.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 64,
         titleTextStyle: Theme.of(context).textTheme.headlineMedium,
         title: const Text("Libraries"),
+        actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            // The badge shows the number of pending invites
+            icon: Badge.count(
+              count: inviteCount,
+              isLabelVisible: inviteCount > 0,
+              child: const Icon(Icons.notifications_none_rounded),
+            ),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+            ),
+          ),
+        ],
       ),
       body: librariesAsync.when(
         data: (items) => ListView.builder(
