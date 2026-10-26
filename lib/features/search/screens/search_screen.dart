@@ -97,7 +97,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                   },
                 );
               },
-              error: (err, stack) => Center(child: Text('Error: $err')),
+              error: (err, stack) => Center(child: Text('$err')),
               loading: () => const Center(child: CircularProgressIndicator()),
             ),
           ),

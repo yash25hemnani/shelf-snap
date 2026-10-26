@@ -5,6 +5,15 @@ import 'package:shelf_snap/core/config/api_config.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:http/http.dart' as http;
 
+// A search failure with a message that's safe to show on screen
+class SearchException implements Exception {
+  final String message;
+  const SearchException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class BookSearchService {
   Future<List<BookModel>> searchBooks(String query) =>
       _getBooks('/search-books', {'q': query});
@@ -32,8 +41,12 @@ class BookSearchService {
         .get(uri, headers: {'Authorization': 'Bearer $idToken'})
         .timeout(const Duration(seconds: 15));
 
+    // 503 means Google Books is rate limiting the backend for a moment
+    if (response.statusCode == 503) {
+      throw const SearchException('Search is busy, try again shortly');
+    }
     if (response.statusCode != 200) {
-      throw Exception('Search failed (${response.statusCode})');
+      throw SearchException('Search failed (${response.statusCode})');
     }
 
     final decoded = jsonDecode(response.body);
