@@ -155,10 +155,7 @@ class ProfileScreen extends ConsumerWidget {
             label: const Text('Sign out'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.error,
-              side: const BorderSide(color: AppColors.border),
-              minimumSize: const Size.fromHeight(52),
-              shape: const StadiumBorder(),
-              textStyle: theme.textTheme.titleMedium,
+              minimumSize: const Size.fromHeight(52), // full width
             ),
           ),
         ],
