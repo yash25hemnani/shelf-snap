@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 
@@ -88,9 +89,7 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Could not create library: $e")));
+      ScaffoldMessenger.of(context).showError("Couldn't save library");
     }
   }
 
@@ -98,84 +97,101 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              _isEditing ? "Edit Library" : "New library",
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-
-            // Preview of the banner the library will get
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: 88,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                image: DecorationImage(
-                  image: AssetImage(AppColors.libraryBanners[_banner]!),
-                  fit: BoxFit.cover,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                for (final entry in AppColors.libraryBanners.entries)
-                  GestureDetector(
-                    onTap: () => setState(() => _banner = entry.key),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
-                      width: 64,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(10),
-                        image: DecorationImage(
-                          image: AssetImage(entry.value),
-                          fit: BoxFit.cover,
-                        ),
-                        // Ring around the selected banner
-                        border: Border.all(
-                          color: entry.key == _banner
-                              ? AppColors.text
-                              : AppColors.background,
-                          width: 2,
-                        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Full-width preview of the chosen banner
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    height: 140,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      image: DecorationImage(
+                        image: AssetImage(AppColors.libraryBanners[_banner]!),
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-            TextFormField(
-              controller: _nameController,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: "Name"),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return "Enter a name";
-                }
-                return null;
-              },
-            ),
-            const SizedBox(height: 12),
-            TextFormField(
-              controller: _descController,
-              maxLength: 200,
-              minLines: 1,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: "Description (optional)",
+                  // Banner options, centred under the preview
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final entry in AppColors.libraryBanners.entries)
+                        GestureDetector(
+                          onTap: () => setState(() => _banner = entry.key),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 150),
+                            width: 64,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              image: DecorationImage(
+                                image: AssetImage(entry.value),
+                                fit: BoxFit.cover,
+                              ),
+                              // Ring around the selected banner
+                              border: Border.all(
+                                color: entry.key == _banner
+                                    ? AppColors.primary
+                                    : AppColors.background,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  const _FieldLabel('Library Name'),
+                  TextFormField(
+                    controller: _nameController,
+                    textCapitalization: TextCapitalization.words,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      hintText: 'e.g. Book Buddies',
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Enter a name';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+
+                  const _FieldLabel('Description (optional)'),
+                  TextFormField(
+                    controller: _descController,
+                    maxLength: 200,
+                    minLines: 3,
+                    maxLines: 5,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(
+                      hintText: 'A shared space for book lovers…',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            FilledButton(
+          ),
+
+          // Stays at the bottom, above the keyboard
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: FilledButton(
               onPressed: _isSaving ? null : _onSubmit,
               child: _isSaving
                   ? const SizedBox(
@@ -183,11 +199,23 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text("Create library"),
+                  : Text(_isEditing ? 'Save changes' : 'Create Library'),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
+}
+
+// Bold label shown above a field
+class _FieldLabel extends StatelessWidget {
+  final String text;
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Text(text, style: Theme.of(context).textTheme.labelLarge),
+  );
 }

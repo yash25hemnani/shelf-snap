@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
-import 'package:shelf_snap/core/widgets/stat_card.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/invites/sheets/invite_sheet.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
@@ -153,6 +152,7 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                               Text(live.name, style: textTheme.titleLarge),
                               Text(
                                 '$memberCount ${memberCount == 1 ? 'member' : 'members'}'
+                                ' · ${live.bookCount} ${live.bookCount == 1 ? 'book' : 'books'}'
                                 '${ownerName != null ? ' · Owned by $ownerName' : ''}',
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: AppColors.textSecondary,
@@ -184,27 +184,6 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                                 ],
                               ),
                               const SizedBox(height: 12),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: StatCard(
-                                      icon: Icons.menu_book_rounded,
-                                      value: '${live.bookCount}',
-                                      label: 'Books',
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  // Lending isn't tracked yet
-                                  const Expanded(
-                                    child: StatCard(
-                                      icon: Icons.outbox_rounded,
-                                      value: '0',
-                                      label: 'Lent',
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
                             ],
                           ),
                         ),
@@ -219,27 +198,16 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                 ),
               ),
             ],
-            // Pushed down by the pinned header's height, so the search box
-            // and the first row always stay visible under the tabs
-            body: Builder(
-              builder: (context) {
-                final handle = NestedScrollView.sliverOverlapAbsorberHandleFor(
-                  context,
-                );
-                return ListenableBuilder(
-                  listenable: handle,
-                  builder: (context, child) => Padding(
-                    padding: EdgeInsets.only(top: handle.layoutExtent ?? 0),
-                    child: child,
-                  ),
-                  child: TabBarView(
-                    children: [
-                      BooksTab(libraryId: library.id!),
-                      MembersTab(library: live),
-                    ],
-                  ),
-                );
-              },
+            // Pushed down by the pinned header's height from the first frame,
+            // so the search box and the first row stay visible under the tabs
+            body: Padding(
+              padding: EdgeInsets.only(top: pinnedHeight),
+              child: TabBarView(
+                children: [
+                  BooksTab(libraryId: library.id!),
+                  MembersTab(library: live),
+                ],
+              ),
             ),
           ),
         ),
