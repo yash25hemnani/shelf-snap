@@ -6,16 +6,25 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:shelf_snap/features/scanner/models/barcode_hit.dart';
 import 'package:shelf_snap/features/scanner/providers/barcode_session_provider.dart';
 import 'package:shelf_snap/features/scanner/widgets/aim_box.dart';
-import 'package:shelf_snap/features/scanner/widgets/barcode_scan_feed.dart';
 
 class BarcodeScannerView extends ConsumerStatefulWidget {
   final ValueChanged<String> onIsbn;
 
   const BarcodeScannerView({super.key, required this.onIsbn});
 
+  /// A wide, short box (barcode-shaped) in the upper part of the screen.
+  /// The scanner screen also uses it to place the status card below.
+  static Rect aimWindow(Size size) {
+    final width = (size.width * 0.8).clamp(0.0, 360.0);
+    return Rect.fromCenter(
+      center: Offset(size.width / 2, size.height * 0.3),
+      width: width,
+      height: width * 0.45,
+    );
+  }
+
   @override
-  ConsumerState<BarcodeScannerView> createState() =>
-      _BarcodeScannerViewState();
+  ConsumerState<BarcodeScannerView> createState() => _BarcodeScannerViewState();
 }
 
 class _BarcodeScannerViewState extends ConsumerState<BarcodeScannerView> {
@@ -31,12 +40,9 @@ class _BarcodeScannerViewState extends ConsumerState<BarcodeScannerView> {
   bool? _wasRunning;
   MobileScannerException? _lastError;
 
-  // Short-lived feedback: green outline on a new scan, and the ISBN of a
-  // scan that was already in the session
+  // Green outline for a moment after a new scan
   bool _flashNew = false;
-  String? _duplicateIsbn;
   Timer? _flashTimer;
-  Timer? _duplicateTimer;
 
   @override
   void initState() {
@@ -78,9 +84,7 @@ class _BarcodeScannerViewState extends ConsumerState<BarcodeScannerView> {
 
       // Failed lookups count as new, since scanning again retries them
       final existing = ref.read(barcodeSessionProvider)[code];
-      if (existing != null && existing.status != HitStatus.failed) {
-        _showDuplicate(code);
-      } else {
+      if (existing == null || existing.status == HitStatus.failed) {
         _flashOutline();
       }
       widget.onIsbn(code);
@@ -95,71 +99,32 @@ class _BarcodeScannerViewState extends ConsumerState<BarcodeScannerView> {
     });
   }
 
-  void _showDuplicate(String isbn) {
-    _duplicateTimer?.cancel();
-    setState(() => _duplicateIsbn = isbn);
-    _duplicateTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _duplicateIsbn = null);
-    });
-  }
-
   @override
   void dispose() {
     _flashTimer?.cancel();
-    _duplicateTimer?.cancel();
     _controller.removeListener(_logState);
     _controller.dispose();
     super.dispose();
-  }
-
-  /// A wide, short box (barcode-shaped), a bit above centre so the bottom
-  /// controls don't cover it.
-  static Rect _aimWindow(Size size) {
-    final width = (size.width * 0.8).clamp(0.0, 360.0);
-    return Rect.fromCenter(
-      center: Offset(size.width / 2, size.height * 0.3),
-      width: width,
-      height: width * 0.45,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final window = _aimWindow(constraints.biggest);
-        final count = ref.watch(barcodeSessionProvider).length;
+        final window = BarcodeScannerView.aimWindow(constraints.biggest);
 
         return Stack(
           children: [
             // No scanWindow: the whole frame is scanned, the box is a guide
             Positioned.fill(
-              child: MobileScanner(controller: _controller, onDetect: _onDetect),
+              child: MobileScanner(
+                controller: _controller,
+                onDetect: _onDetect,
+              ),
             ),
             AimBox(
               window: window,
               borderColor: _flashNew ? Colors.greenAccent : Colors.white,
-            ),
-
-            // Hint under the box, then the live feed of recent scans
-            Positioned(
-              left: window.left,
-              right: constraints.maxWidth - window.right,
-              top: window.bottom + 12,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    count == 0
-                        ? 'Point at the barcode on the back cover'
-                        : 'Scanned $count ${count == 1 ? 'book' : 'books'}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  const SizedBox(height: 12),
-                  BarcodeScanFeed(highlightIsbn: _duplicateIsbn),
-                ],
-              ),
             ),
           ],
         );

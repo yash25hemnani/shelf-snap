@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shelf_snap/features/scanner/models/barcode_hit.dart';
 import 'package:shelf_snap/features/scanner/models/scan_mode.dart';
 import 'package:shelf_snap/features/scanner/providers/barcode_session_provider.dart';
 import 'package:shelf_snap/features/scanner/providers/scan_session_provider.dart';
 import 'package:shelf_snap/features/scanner/widgets/barcode_scanner_view.dart';
 import 'package:shelf_snap/features/scanner/widgets/barcode_sheet.dart';
+import 'package:shelf_snap/features/scanner/widgets/barcode_status_card.dart';
 import 'package:shelf_snap/features/scanner/widgets/scan_count_badge.dart';
 import 'package:shelf_snap/features/scanner/widgets/scan_input_toggle.dart';
 import 'package:shelf_snap/features/scanner/widgets/scan_mode_toggle.dart';
@@ -29,6 +33,18 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   ScanMode _mode = ScanMode.add;
   ScanInput _input = ScanInput.shelf;
+
+  // ISBN scanned again, highlighted in the status card for a moment
+  String? _duplicateIsbn;
+  Timer? _duplicateTimer;
+
+  void _showDuplicate(String isbn) {
+    _duplicateTimer?.cancel();
+    setState(() => _duplicateIsbn = isbn);
+    _duplicateTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _duplicateIsbn = null);
+    });
+  }
 
   void _setMode(ScanMode mode) {
     setState(() {
@@ -64,6 +80,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     if (!notifier.add(isbn)) {
       debugPrint('[Barcode] $isbn already in session, ignored');
       HapticFeedback.lightImpact(); // already in this session
+      _showDuplicate(isbn);
       return;
     }
 
@@ -175,8 +192,17 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   @override
   void dispose() {
+    _duplicateTimer?.cancel();
     _controller?.dispose();
     super.dispose();
+  }
+
+  // Space between the top bar and the status card, so the card starts
+  // 16px below the aim box. The top bar is one icon button high.
+  double _cardGap(BuildContext context) {
+    final window = BarcodeScannerView.aimWindow(MediaQuery.sizeOf(context));
+    final top = MediaQuery.paddingOf(context).top + kMinInteractiveDimension;
+    return (window.bottom + 16 - top).clamp(0.0, double.infinity);
   }
 
   @override
@@ -184,7 +210,10 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final session = ref.watch(scanSessionProvider);
     final hits = ref.watch(barcodeSessionProvider);
     final isShelf = _input == ScanInput.shelf;
-    final count = isShelf ? session.results.length : hits.length;
+    // Books ready to save, the same ones the results sheet lists
+    final count = isShelf
+        ? session.results.length
+        : hits.values.where((h) => h.status == HitStatus.found).length;
 
     ref.watch(
       shelfCaptureServiceProvider,
@@ -226,7 +255,19 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       const SizedBox(width: 48),
                     ],
                   ),
-                  const Spacer(),
+                  // Status card from just below the aim box down to the toggle
+                  if (isShelf)
+                    const Spacer()
+                  else ...[
+                    SizedBox(height: _cardGap(context)),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: BarcodeStatusCard(highlightIsbn: _duplicateIsbn),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (_mode == ScanMode.add)
                     ScanInputToggle(input: _input, onChanged: _setInput),
 
