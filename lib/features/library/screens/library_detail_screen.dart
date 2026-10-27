@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/invites/sheets/invite_sheet.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/screens/create_library_screen.dart';
 import 'package:shelf_snap/features/library/widgets/books_tab.dart';
 import 'package:shelf_snap/features/library/widgets/member_avatars.dart';
 import 'package:shelf_snap/features/library/widgets/members_tab.dart';
@@ -72,6 +74,71 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _onAction(
+    _LibraryAction action,
+    LibraryModel library,
+    bool isOwner,
+  ) async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    if (action == _LibraryAction.edit) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CreateLibraryScreen(userId: userId, library: library),
+        ),
+      );
+      return;
+    }
+
+    final isDelete = action == _LibraryAction.delete;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(
+          isDelete ? 'Delete ${library.name}?' : 'Leave ${library.name}?',
+        ),
+        content: Text(
+          isDelete
+              ? 'All its books are deleted for every member. This cannot be undone.'
+              : "You'll lose access to this library's books until you're invited again.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: Text(isDelete ? 'Delete' : 'Leave'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    // Back to the list first, since this page loses access once it's done
+    final messenger = ScaffoldMessenger.of(context);
+    final repository = ref.read(libraryRepositoryProvider);
+    Navigator.pop(context);
+
+    try {
+      if (isDelete) {
+        await repository.deleteLibrary(library.id!);
+        messenger.showMessage('Deleted ${library.name}');
+      } else {
+        await repository.removeMember(library.id!, userId);
+        messenger.showMessage('Left ${library.name}');
+      }
+    } catch (e) {
+      messenger.showError(
+        isDelete ? "Couldn't delete library" : "Couldn't leave library",
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final library = widget.library;
@@ -130,6 +197,42 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                         ),
                         // Title sits right after the back arrow
                         titleSpacing: 0,
+                        actions: [
+                          PopupMenuButton<_LibraryAction>(
+                            tooltip: 'Library options',
+                            icon: const Icon(Icons.more_vert_rounded),
+                            onSelected: (action) =>
+                                _onAction(action, live, isOwner),
+                            // Owner edits or deletes; members can only leave
+                            itemBuilder: (_) => isOwner
+                                ? const [
+                                    PopupMenuItem(
+                                      value: _LibraryAction.edit,
+                                      child: Text('Edit library'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: _LibraryAction.delete,
+                                      child: Text(
+                                        'Delete library',
+                                        style: TextStyle(
+                                          color: AppColors.error,
+                                        ),
+                                      ),
+                                    ),
+                                  ]
+                                : const [
+                                    PopupMenuItem(
+                                      value: _LibraryAction.leave,
+                                      child: Text(
+                                        'Leave library',
+                                        style: TextStyle(
+                                          color: AppColors.error,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                          ),
+                        ],
                         titleTextStyle: textTheme.headlineSmall?.copyWith(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
@@ -215,6 +318,8 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     );
   }
 }
+
+enum _LibraryAction { edit, delete, leave }
 
 // Tells NestedScrollView how much of the header stays pinned, which
 // SliverMainAxisGroup doesn't report on its own

@@ -169,9 +169,24 @@ class LibraryRepository {
         );
   }
 
-  // Delete a library
+  // Deletes every book in the library, then the library itself.
+  // Books go first because their rules check the library's members.
   Future<void> deleteLibrary(String libraryId) async {
-    await _db.collection('libraries').doc(libraryId).delete();
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+
+    // A batch holds at most 500 writes
+    while (true) {
+      final page = await libraryRef.collection('books').limit(400).get();
+      if (page.docs.isEmpty) break;
+
+      final batch = _db.batch();
+      for (final doc in page.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    }
+
+    await libraryRef.delete();
   }
 
   // Remove one copy of a book, deleting the doc when it was the last copy
@@ -202,6 +217,7 @@ class LibraryRepository {
     await batch.commit();
   }
 
+  // Owner removing someone, or a member leaving with their own uid
   Future<void> removeMember(String libraryId, String uid) {
     return _db.collection('libraries').doc(libraryId).update({
       'members': FieldValue.arrayRemove([uid]),
