@@ -38,6 +38,10 @@ class BookModel {
   /// Placeholder when the provider sends no title.
   static const unknownTitle = 'Unknown Title';
 
+  /// Search tokens are word prefixes between these lengths.
+  static const searchTokenMin = 2;
+  static const searchTokenMax = 15;
+
   const BookModel({
     this.id,
     this.libraryId,
@@ -102,6 +106,7 @@ class BookModel {
     'language': language,
     'coverUrl': coverUrl,
     'source': source?.name,
+    'searchTokens': searchTokens,
   };
 
   /// Only our own fields change; the book facts come from the provider.
@@ -133,6 +138,35 @@ class BookModel {
 
   /// "A, B" for display; null when there are no authors.
   String? get authorLine => authors.isEmpty ? null : authors.join(', ');
+
+  /// Word prefixes of the title, subtitle and authors.
+  /// "Harry Potter" → ha, har, harr, harry, po, pot, ...
+  List<String> get searchTokens {
+    final text = [
+      if (title != unknownTitle) title,
+      ?subtitle,
+      ...authors,
+    ].join(' ');
+
+    final tokens = <String>{};
+    for (final word in sanitizeWords(text)) {
+      for (var i = searchTokenMin; i <= word.length; i++) {
+        tokens.add(word.substring(0, i));
+      }
+    }
+    return tokens.toList();
+  }
+
+  /// Lowercase, accent-free words for search, cut to the token length limits.
+  static List<String> sanitizeWords(String s) =>
+      removeDiacritics(s.toLowerCase())
+          .split(RegExp(r'[^\p{L}\p{M}\p{N}]+', unicode: true))
+          .where((w) => w.length >= searchTokenMin)
+          .map(
+            (w) =>
+                w.length > searchTokenMax ? w.substring(0, searchTokenMax) : w,
+          )
+          .toList();
 
   @override
   String toString() =>

@@ -103,8 +103,10 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(_isEditing ? "Edit Library" 
-                            :  "New library", style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              _isEditing ? "Edit Library" : "New library",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
 
             // Preview of the banner the library will get
@@ -113,10 +115,9 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
               height: 88,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: AppColors.libraryBanners[_banner]!,
+                image: DecorationImage(
+                  image: AssetImage(AppColors.libraryBanners[_banner]!),
+                  fit: BoxFit.cover,
                 ),
               ),
             ),
@@ -130,12 +131,15 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
                     onTap: () => setState(() => _banner = entry.key),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 150),
-                      width: 36,
-                      height: 36,
+                      width: 64,
+                      height: 40,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(colors: entry.value),
-                        // Ring around the selected gradient
+                        borderRadius: BorderRadius.circular(10),
+                        image: DecorationImage(
+                          image: AssetImage(entry.value),
+                          fit: BoxFit.cover,
+                        ),
+                        // Ring around the selected banner
                         border: Border.all(
                           color: entry.key == _banner
                               ? AppColors.text

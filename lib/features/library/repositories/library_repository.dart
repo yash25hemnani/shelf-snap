@@ -37,6 +37,15 @@ class LibraryRepository {
         );
   }
 
+  Stream<LibraryModel?> watchLibrary(String libraryId) {
+    return _db.collection('libraries').doc(libraryId).snapshots().map((snap) {
+      // Null once the library is deleted
+      if (!snap.exists) return null;
+
+      return LibraryModel.fromMap(libraryId, snap.data()!);
+    });
+  }
+
   // Find the doc for the same edition in a library, or null if there isn't one
   Future<DocumentReference<Map<String, dynamic>>?> findBookInLibrary(
     String libraryId,
@@ -114,11 +123,13 @@ class LibraryRepository {
 
   // Watch books in a library. Each book remembers this library, so it can
   // be found again by its full path (libraries/{libraryId}/books/{id}).
-  Stream<List<BookModel>> watchBooks(String libraryId) {
+  Stream<List<BookModel>> watchBooks(String libraryId, {required int limit}) {
     return _db
         .collection('libraries')
         .doc(libraryId)
         .collection('books')
+        .orderBy('addedAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -126,6 +137,32 @@ class LibraryRepository {
                 (doc) => BookModel.fromMap(
                   doc.id,
                   doc.data(),
+                ).copyWith(libraryId: libraryId),
+              )
+              .toList(),
+        );
+  }
+
+  // Newest books whose title, subtitle or author has a word starting with token
+  Stream<List<BookModel>> searchBooks(
+    String libraryId,
+    String token, {
+    int limit = 50,
+  }) {
+    return _db
+        .collection('libraries')
+        .doc(libraryId)
+        .collection('books')
+        .where('searchTokens', arrayContains: token)
+        .orderBy('addedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(
+                (d) => BookModel.fromMap(
+                  d.id,
+                  d.data(),
                 ).copyWith(libraryId: libraryId),
               )
               .toList(),
@@ -163,5 +200,12 @@ class LibraryRepository {
       });
     }
     await batch.commit();
+  }
+
+  Future<void> removeMember(String libraryId, String uid) {
+    return _db.collection('libraries').doc(libraryId).update({
+      'members': FieldValue.arrayRemove([uid]),
+      'updatedAt': Timestamp.now(),
+    });
   }
 }

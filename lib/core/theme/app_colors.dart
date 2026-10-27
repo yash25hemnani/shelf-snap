@@ -29,16 +29,26 @@ class AppColors {
   static const infoSoft = Color(0xFFEEF1EF);
   static const error = Color(0xFFD64545);
   static const errorSoft = Color(0xFFFBEAEA);
+  // Lent, paused, busy states
+  static const warning = Color(0xFFC98A1B);
+  static const warningSoft = Color(0xFFFBF1DE);
+  // Reading and other in-progress states
+  static const accent = Color(0xFF3A6EA5);
+  static const accentSoft = Color(0xFFE6EEF7);
 
-  // Library banners: each entry is the start and end colour of a gradient.
-  // A library stores the name, so entries can be reordered or restyled.
-  static const defaultBanner = 'forest';
-  static const libraryBanners = <String, List<Color>>{
-    'forest': [Color(0xFF2F6B4F), Color(0xFF7FB89A)],
-    'lake': [Color(0xFF1F4A6B), Color(0xFF7FA8C9)],
-    'clay': [Color(0xFF8A4B2F), Color(0xFFE0A77F)],
-    'dusk': [Color(0xFF5B3F8A), Color(0xFFB39BD9)],
-    'honey': [Color(0xFF8A6A1F), Color(0xFFE3C46B)],
-    'slate': [Color(0xFF3F4A45), Color(0xFF9AA8A0)],
+  // Avatar colours as [text, background]; each user always gets the same pair
+  static const avatarColors = <List<Color>>[
+    [primary, primarySoft],
+    [accent, accentSoft],
+    [warning, warningSoft],
+    [error, errorSoft],
+  ];
+
+  // Library banners: key to a photo in assets/banners/.
+  // A library stores the key, so photos can be swapped without touching data.
+  static const defaultBanner = 'banner-1';
+  static const libraryBanners = <String, String>{
+    'banner-1': 'assets/banners/banner-1.jpg',
+    'banner-2': 'assets/banners/banner-2.jpg',
   };
 }

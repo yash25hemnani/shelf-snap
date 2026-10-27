@@ -61,9 +61,6 @@ class LibraryModel {
     );
   }
 
-  LinearGradient get bannerGradient => LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: AppColors.libraryBanners[banner]!,
-  );
+  ImageProvider get bannerImage =>
+      AssetImage(AppColors.libraryBanners[banner]!);
 }

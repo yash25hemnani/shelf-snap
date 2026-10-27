@@ -33,6 +33,20 @@ class UserRepository {
     });
   }
 
+  Stream<List<UserModel>> watchUsers(List<String> uids) {
+    if (uids.isEmpty) return Stream.value([]);
+
+    return _db
+        .collection('users')
+        .where(FieldPath.documentId, whereIn: uids)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((d) => UserModel.fromMap(d.id, d.data()))
+              .toList(),
+        );
+  }
+
   // Users whose username starts with prefix, A–Z, excluding the signed-in user
   Future<List<UserModel>> searchUsers(String prefix) async {
     final uid = AuthService().currentUser?.uid;
