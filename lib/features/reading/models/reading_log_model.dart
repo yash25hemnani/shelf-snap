@@ -57,7 +57,8 @@ class ReadingLogModel {
 
   final BookStatus status;
   final DateTime? startedAt; // current read; null until it starts
-  final List<PastRead>? pastReads;
+  final double progress; // current read, 0–1
+  final List<PastRead> pastReads;
   // final List<Session> sessions;
   final DateTime? createdAt; // null until saved
   final DateTime? updatedAt;
@@ -73,7 +74,8 @@ class ReadingLogModel {
     this.pageCount,
     this.status = BookStatus.wantToRead,
     this.startedAt,
-    this.pastReads,
+    this.progress = 0,
+    this.pastReads = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -92,6 +94,8 @@ class ReadingLogModel {
             BookStatus.values.asNameMap()[map['status']] ??
             BookStatus.wantToRead,
         startedAt: (map['startedAt'] as Timestamp?)?.toDate(),
+        // Firestore returns whole numbers as int
+        progress: (map['progress'] as num?)?.toDouble() ?? 0,
         pastReads: (map['pastReads'] as List? ?? [])
             .map((read) => PastRead.fromMap(read as Map<String, dynamic>))
             .toList(),
@@ -109,7 +113,8 @@ class ReadingLogModel {
     'pageCount': pageCount,
     'status': status.name,
     'startedAt': startedAt == null ? null : Timestamp.fromDate(startedAt!),
-    'pastReads': (pastReads ?? []).map((read) => read.toMap()).toList(),
+    'progress': progress,
+    'pastReads': pastReads.map((read) => read.toMap()).toList(),
     'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
     'updatedAt': Timestamp.now(), // every save is an update
   };
