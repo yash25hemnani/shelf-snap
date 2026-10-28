@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/reading/models/read_model.dart';
 
 enum BookStatus { wantToRead, reading, paused, finished, dnf }
 
@@ -13,41 +14,11 @@ extension BookStatusLabel on BookStatus {
   };
 }
 
-class PastRead {
-  final DateTime startedAt;
-  final DateTime endedAt;
-  final BookStatus bookStatus;
-  final double progress;
-
-  const PastRead({
-    required this.startedAt,
-    required this.endedAt,
-    required this.bookStatus,
-    required this.progress,
-  });
-
-  factory PastRead.fromMap(Map<String, dynamic> map) => PastRead(
-    startedAt: (map['startedAt'] as Timestamp).toDate(),
-    endedAt: (map['endedAt'] as Timestamp).toDate(),
-    bookStatus:
-        BookStatus.values.asNameMap()[map['bookStatus']] ?? BookStatus.finished,
-    progress: (map['progress'] as num?)?.toDouble() ?? 0,
-  );
-
-  Map<String, dynamic> toMap() => {
-    'startedAt': Timestamp.fromDate(startedAt),
-    'endedAt': Timestamp.fromDate(endedAt),
-    'bookStatus': bookStatus.name,
-    'progress': progress,
-  };
-}
-
+// One book on the user's reading list: users/{uid}/readingLogs/{readingKey}.
+// The reads themselves live in the reads/ subcollection.
 class ReadingLogModel {
-  final String? id;
-  // Optional link to a library book; null for search books
-  final String? bookId;
-  final String readingId;
-  final String? aliasFor;
+  final String? id; // the readingKey; null until saved
+  final String? bookId; // library book id; null for search books
 
   // A copy of the book, so the log works without a library
   final String title;
@@ -55,67 +26,88 @@ class ReadingLogModel {
   final String? coverUrl;
   final int? pageCount;
 
+  // The latest read's status, or want to read. Kept on the log so the
+  // list can filter by it.
   final BookStatus status;
-  final DateTime? startedAt; // current read; null until it starts
-  final double progress; // current read, 0–1
-  final List<PastRead> pastReads;
-  // final List<Session> sessions;
-  final DateTime? createdAt; // null until saved
+  // A copy of the latest read, so screens only need the log; null = no read yet
+  final ReadModel? latestRead;
+  final DateTime? createdAt;
   final DateTime? updatedAt;
 
   const ReadingLogModel({
     this.id,
     this.bookId,
-    required this.readingId,
-    this.aliasFor,
     required this.title,
     this.authors = const [],
     this.coverUrl,
     this.pageCount,
     this.status = BookStatus.wantToRead,
-    this.startedAt,
-    this.progress = 0,
-    this.pastReads = const [],
+    this.latestRead,
     this.createdAt,
     this.updatedAt,
   });
 
-  factory ReadingLogModel.fromMap(String id, Map<String, dynamic> map) =>
-      ReadingLogModel(
-        id: id,
-        bookId: map['bookId'],
-        readingId: map['readingId'],
-        aliasFor: map['aliasFor'],
-        title: map['title'] as String? ?? BookModel.unknownTitle,
-        authors: (map['authors'] as List?)?.cast<String>() ?? const [],
-        coverUrl: map['coverUrl'] as String?,
-        pageCount: (map['pageCount'] as num?)?.toInt(),
-        status:
-            BookStatus.values.asNameMap()[map['status']] ??
-            BookStatus.wantToRead,
-        startedAt: (map['startedAt'] as Timestamp?)?.toDate(),
-        // Firestore returns whole numbers as int
-        progress: (map['progress'] as num?)?.toDouble() ?? 0,
-        pastReads: (map['pastReads'] as List? ?? [])
-            .map((read) => PastRead.fromMap(read as Map<String, dynamic>))
-            .toList(),
-        createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
-        updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
-      );
+  factory ReadingLogModel.fromMap(String id, Map<String, dynamic> map) {
+    final readId = map['latestReadId'] as String?;
+    // Firestore returns nested maps as Map<dynamic, dynamic> on some platforms
+    final readMap = (map['latestRead'] as Map?)?.cast<String, dynamic>();
+
+    return ReadingLogModel(
+      id: id,
+      bookId: map['bookId'] as String?,
+      title: map['title'] as String? ?? BookModel.unknownTitle,
+      // Firestore returns List<dynamic>, so cast the items
+      authors: (map['authors'] as List?)?.cast<String>() ?? const [],
+      coverUrl: map['coverUrl'] as String?,
+      pageCount: (map['pageCount'] as num?)?.toInt(),
+      status:
+          BookStatus.values.asNameMap()[map['status']] ?? BookStatus.wantToRead,
+      latestRead: readId == null || readMap == null
+          ? null
+          : ReadModel.fromMap(readId, readMap),
+      createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
+      updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+    );
+  }
 
   Map<String, dynamic> toMap() => {
-    'readingId': readingId,
+    // No 'id': it's the doc id, so storing it would duplicate it
     'bookId': bookId,
-    'aliasFor': aliasFor,
     'title': title,
     'authors': authors,
     'coverUrl': coverUrl,
     'pageCount': pageCount,
     'status': status.name,
-    'startedAt': startedAt == null ? null : Timestamp.fromDate(startedAt!),
-    'progress': progress,
-    'pastReads': pastReads.map((read) => read.toMap()).toList(),
+    // The read's own map has no id, so it's saved next to it
+    'latestReadId': latestRead?.id,
+    'latestRead': latestRead?.toMap(),
     'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
-    'updatedAt': Timestamp.now(), // every save is an update
+    'updatedAt': Timestamp.now(),
   };
+
+  // Reading or paused: the latest read is still going
+  bool get hasActiveRead =>
+      status == BookStatus.reading || status == BookStatus.paused;
+
+  // A copy with the given fields changed. Passing null keeps the current
+  // value, so use [clearLatestRead] when the latest read is deleted.
+  ReadingLogModel copyWith({
+    int? pageCount,
+    BookStatus? status,
+    ReadModel? latestRead,
+    bool clearLatestRead = false,
+  }) {
+    return ReadingLogModel(
+      id: id,
+      bookId: bookId,
+      title: title,
+      authors: authors,
+      coverUrl: coverUrl,
+      pageCount: pageCount ?? this.pageCount,
+      status: status ?? this.status,
+      latestRead: clearLatestRead ? null : (latestRead ?? this.latestRead),
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+    );
+  }
 }
