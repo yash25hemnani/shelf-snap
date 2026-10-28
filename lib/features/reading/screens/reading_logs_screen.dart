@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
+import 'package:shelf_snap/features/reading/screens/reading_log_detail_screen.dart';
 import 'package:shelf_snap/features/reading/widgets/reading_log_tile.dart';
 
 // The user's reading list, filtered by status with chips at the top
@@ -65,7 +66,16 @@ class ReadingLogsScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   itemCount: logs.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => ReadingLogTile(log: logs[i]),
+                  itemBuilder: (_, i) => ReadingLogTile(
+                    log: logs[i],
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            ReadingLogDetailScreen(readingKey: logs[i].id!),
+                      ),
+                    ),
+                  ),
                 );
               },
               error: (e, _) =>
