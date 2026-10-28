@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
@@ -62,17 +63,30 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
   // The log stream shows the new status as soon as it's written locally
   Future<void> _onStatusChanged(BookStatus status) async {
     final userId = AuthService().currentUser?.uid;
-    if (userId == null) return;
+    final readingKey = widget.book.readingKey;
+    if (userId == null || readingKey == null) return;
+
+    // Picking the current status isn't a blocked move, so skip it here
+    final current = ref
+        .read(readingLogProvider(readingKey))
+        .valueOrNull
+        ?.status;
+    if (status == current) return;
 
     try {
-      await ref
+      final saved = await ref
           .read(readingLogRepositoryProvider)
-          .updateBookStatus(status, widget.book, userId);
+          .updateStatus(status, widget.book, userId);
+      if (!saved && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showMessage("Can't move this book back to ${status.label}");
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not update status: $e')));
+      ).showError("Couldn't update status, check your connection");
     }
   }
 
