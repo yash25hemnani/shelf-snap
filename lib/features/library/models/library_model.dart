@@ -11,6 +11,7 @@ class LibraryModel {
   final int bookCount; // physical books, sum of noOfCopies
   final int uniqueCount; // distinct editions, one per book doc
   final List<String> members;
+  final List<String> editors; // can edit copies; always inside members
   final String banner; // key in AppColors.libraryBanners
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -24,6 +25,7 @@ class LibraryModel {
     this.bookCount = 0,
     this.uniqueCount = 0,
     this.members = const [],
+    this.editors = const [],
     this.banner = AppColors.defaultBanner,
     required this.createdAt,
     required this.updatedAt,
@@ -37,6 +39,7 @@ class LibraryModel {
     'bookCount': bookCount,
     'uniqueCount': uniqueCount,
     'members': members,
+    'editors': editors,
     'banner': banner,
     'createdAt': Timestamp.fromDate(createdAt),
     'updatedAt': Timestamp.fromDate(updatedAt),
@@ -52,6 +55,8 @@ class LibraryModel {
       bookCount: (map['bookCount'] as num?)?.toInt() ?? 0,
       uniqueCount: (map['uniqueCount'] as num?)?.toInt() ?? 0,
       members: List<String>.from(map['members'] ?? []),
+      // Libraries made before editors existed: only the owner can edit
+      editors: List<String>.from(map['editors'] ?? [map['ownerId'] ?? '']),
       // Missing or removed banner names fall back to the default
       banner: AppColors.libraryBanners.containsKey(map['banner'])
           ? map['banner'] as String
@@ -63,4 +68,9 @@ class LibraryModel {
 
   ImageProvider get bannerImage =>
       AssetImage(AppColors.libraryBanners[banner]!);
+
+  // True when this user can edit the library's copies. The owner always
+  // can, even if the editors list was written without them.
+  bool canEdit(String? uid) =>
+      uid != null && (uid == ownerId || editors.contains(uid));
 }

@@ -44,6 +44,14 @@ final libraryProvider = StreamProvider.autoDispose
           ref.watch(libraryRepositoryProvider).watchLibrary(libraryId),
     );
 
+// One saved book, live, so edits show on the book page
+final libraryBookProvider = StreamProvider.autoDispose
+    .family<BookModel?, ({String libraryId, String bookId})>(
+      (ref, ids) => ref
+          .watch(libraryRepositoryProvider)
+          .watchBook(ids.libraryId, ids.bookId),
+    );
+
 // Member profiles of a library, owner first, then by name
 final libraryMembersProvider = StreamProvider.autoDispose
     .family<List<UserModel>, String>((ref, libraryId) {
