@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
@@ -7,8 +8,11 @@ import 'package:shelf_snap/features/profile/providers/user_provider.dart';
 
 final libraryRepositoryProvider = Provider((ref) => LibraryRepository());
 
-// Library picked most recently in a save sheet; kept while the app is open
-final lastLibraryIdProvider = StateProvider<String?>((ref) => null);
+// Library picked most recently in a save sheet; resets when the user changes
+final lastLibraryIdProvider = StateProvider<String?>((ref) {
+  ref.watch(currentUidProvider);
+  return null;
+});
 
 // Books loaded per page in the library detail grid
 const booksPageSize = 30;
