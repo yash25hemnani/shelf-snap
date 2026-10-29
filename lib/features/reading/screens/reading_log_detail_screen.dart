@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
+import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
@@ -158,25 +159,15 @@ class _ReadingLogDetailScreenState
     final readId = read.id;
     if (userId == null || readId == null) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete this read?'),
-        content: const Text('It will be removed from your history.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: 'Delete this read?',
+      message: 'It will be removed from your history.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -195,26 +186,15 @@ class _ReadingLogDetailScreenState
     final userId = AuthService().currentUser?.uid;
     if (userId == null) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Start again?'),
-        content: const Text(
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.replay_rounded,
+      title: 'Start again?',
+      message:
           'A new read starts from page 0. This one is kept in your history.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Start again'),
-          ),
-        ],
-      ),
+      confirmLabel: 'Start again',
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -258,25 +238,15 @@ class _ReadingLogDetailScreenState
     final userId = AuthService().currentUser?.uid;
     if (userId == null) return;
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Remove from reading list?'),
-        content: const Text('Its progress and dates will be deleted.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: 'Remove from reading list?',
+      message: 'Its progress, dates and history will be deleted.',
+      confirmLabel: 'Delete',
+      destructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
     final navigator = Navigator.of(context);
@@ -306,6 +276,8 @@ class _ReadingLogDetailScreenState
         title: const Text('Reading log'),
         titleTextStyle: textTheme.titleMedium,
         titleSpacing: 0,
+        // A thin line between the bar and the page
+        shape: const Border(bottom: BorderSide(color: AppColors.border)),
         actions: [
           PopupMenuButton<void>(
             itemBuilder: (_) => [
@@ -377,209 +349,380 @@ class _ReadingLogDetailScreenState
             ),
           );
 
+          final percent = hasPages
+              ? (currentPage * 100 / pageCount).round()
+              : 0;
+          final small = textTheme.bodySmall?.copyWith(
+            color: AppColors.textSecondary,
+          );
+
           return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.only(bottom: 32),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: SizedBox(
-                        width: 96,
-                        height: 144,
-                        child: coverUrl == null
-                            ? placeholder
-                            : Image.network(
-                                coverUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, _, _) => placeholder,
-                              ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox(
+                          width: 128,
+                          height: 192,
+                          child: coverUrl == null
+                              ? placeholder
+                              : Image.network(
+                                  coverUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, _, _) => placeholder,
+                                ),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(log.title, style: textTheme.titleLarge),
-                          const SizedBox(height: 4),
-                          Text(
-                            log.authors.isEmpty
-                                ? 'Unknown author'
-                                : log.authors.join(', '),
-                            style: muted,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(log.title, style: textTheme.titleLarge),
+                            const SizedBox(height: 4),
+                            Text(
+                              log.authors.isEmpty
+                                  ? 'Unknown author'
+                                  : log.authors.join(', '),
+                              style: muted,
+                            ),
+                            if (hasPages) ...[
+                              const SizedBox(height: 4),
+                              // Tap the row to fix a wrong page count
+                              InkWell(
+                                onTap: () => _editPageCount(log),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.menu_book_outlined,
+                                        size: 18,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${log.pageCount} pages',
+                                        style: muted,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      const Icon(
+                                        Icons.edit_outlined,
+                                        size: 18,
+                                        color: AppColors.primary,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                            StatusDropdown(
+                              value: log.status,
+                              onChanged: (status) =>
+                                  _onStatusChanged(log, status),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!hasPages)
+                        _MissingPagesCard(onAdd: () => _editPageCount(log)),
+
+                      // Want to read has no read, so no progress or dates
+                      if (hasPages && read != null) ...[
+                        _SectionCard(
+                          icon: Icons.bar_chart_rounded,
+                          title: 'Progress',
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Only a reading or paused read takes progress
+                              if (read.isActive)
+                                TextButton(
+                                  onPressed: () =>
+                                      _editProgress(currentPage, pageCount),
+                                  child: const Text('Update'),
+                                ),
+                              _Pill(label: '$percent%'),
+                            ],
                           ),
-                          if (hasPages)
-                            // Tap the row to fix a wrong page count
-                            InkWell(
-                              onTap: () => _editPageCount(log),
-                              borderRadius: BorderRadius.circular(8),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                read.status == BookStatus.finished
+                                    ? 'Finished · $pageCount pages'
+                                    : 'Page $currentPage of $pageCount',
+                                style: muted,
+                              ),
+                              // Drag to move the page; saved when the finger
+                              // lifts. Ended reads show it but can't be dragged.
+                              SliderTheme(
+                                data: SliderTheme.of(context).copyWith(
+                                  trackHeight: 6,
+                                  activeTrackColor: AppColors.primary,
+                                  inactiveTrackColor: AppColors.border,
+                                  thumbColor: AppColors.primary,
+                                  disabledActiveTrackColor: AppColors.primary,
+                                  disabledInactiveTrackColor: AppColors.border,
+                                  disabledThumbColor: AppColors.primary,
+                                  overlayShape: const RoundSliderOverlayShape(
+                                    overlayRadius: 16,
+                                  ),
+                                ),
+                                child: Slider(
+                                  // No side padding, so the track lines up
+                                  // with the text above it
+                                  padding: const EdgeInsets.only(
+                                    top: 16,
+                                    bottom: 6,
+                                  ),
+                                  value: currentPage.toDouble(),
+                                  max: pageCount.toDouble(),
+                                  onChanged: read.isActive
+                                      ? (v) => setState(
+                                          () => _dragPage = v.round(),
+                                        )
+                                      : null,
+                                  onChangeEnd: read.isActive
+                                      ? (v) => _saveProgress(v.round())
+                                      : null,
+                                ),
+                              ),
+                              Row(
                                 children: [
-                                  Text('${log.pageCount} pages', style: muted),
-                                  const SizedBox(width: 4),
-                                  const Icon(
-                                    Icons.edit_outlined,
-                                    size: 16,
-                                    color: AppColors.hint,
+                                  Text('0', style: small),
+                                  const Spacer(),
+                                  Text('$pageCount', style: small),
+                                ],
+                              ),
+                              // Saved on the last page but not finished yet.
+                              // Uses the saved page, so it waits for the drag
+                              // to end.
+                              if (read.isActive &&
+                                  _dragPage == null &&
+                                  savedPage >= pageCount) ...[
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: () => _onStatusChanged(
+                                    log,
+                                    BookStatus.finished,
+                                  ),
+                                  icon: const Icon(Icons.check_circle_rounded),
+                                  label: const Text('Mark as finished'),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _SectionCard(
+                          icon: Icons.calendar_month_outlined,
+                          title: 'Dates',
+                          trailing: TextButton.icon(
+                            onPressed: () => _editDates(read),
+                            icon: const Icon(Icons.edit_outlined, size: 18),
+                            label: const Text('Edit'),
+                          ),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  const Expanded(child: Text('Started')),
+                                  Text(
+                                    read.startedAt?.label ?? 'Not set',
+                                    style: muted,
                                   ),
                                 ],
                               ),
+                              // Only an ended read has an end date
+                              if (!read.isActive) ...[
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        read.status == BookStatus.dnf
+                                            ? 'Stopped'
+                                            : 'Finished',
+                                      ),
+                                    ),
+                                    Text(
+                                      read.endedAt?.label ?? 'Not set',
+                                      style: muted,
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+
+                        // A new read; this one stays in the history
+                        if (!read.isActive) ...[
+                          const SizedBox(height: 16),
+                          OutlinedButton.icon(
+                            onPressed: _startAgain,
+                            icon: const Icon(Icons.replay_rounded),
+                            label: const Text('Start again'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(52),
+                              side: const BorderSide(color: AppColors.primary),
                             ),
-                          const SizedBox(height: 12),
-                          StatusDropdown(
-                            value: log.status,
-                            onChanged: (status) =>
-                                _onStatusChanged(log, status),
                           ),
                         ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (!hasPages) ...[
-                  const SizedBox(height: 24),
-                  _MissingPagesCard(onAdd: () => _editPageCount(log)),
-                ],
-
-                // Want to read has no read, so no progress or dates
-                if (hasPages && read != null) ...[
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('Progress', style: textTheme.titleMedium),
-                      ),
-                      // Only a reading or paused read takes progress
-                      if (read.isActive)
-                        TextButton(
-                          onPressed: () =>
-                              _editProgress(currentPage, pageCount),
-                          child: const Text('Update'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    read.status == BookStatus.finished
-                        ? 'Finished · $pageCount pages'
-                        : 'Page $currentPage of $pageCount · '
-                              '${(currentPage * 100 / pageCount).round()}%',
-                    style: muted,
-                  ),
-                  const SizedBox(height: 4),
-                  // Drag to move the page; saved when the finger lifts.
-                  // Finished and DNF reads show it but can't be dragged.
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 6,
-                      activeTrackColor: AppColors.primary,
-                      inactiveTrackColor: AppColors.surfaceMuted,
-                      thumbColor: AppColors.primary,
-                      disabledActiveTrackColor: AppColors.primary,
-                      disabledInactiveTrackColor: AppColors.surfaceMuted,
-                      disabledThumbColor: AppColors.primary,
-                      overlayShape: const RoundSliderOverlayShape(
-                        overlayRadius: 16,
-                      ),
-                    ),
-                    child: Slider(
-                      value: currentPage.toDouble(),
-                      max: pageCount.toDouble(),
-                      onChanged: read.isActive
-                          ? (v) => setState(() => _dragPage = v.round())
-                          : null,
-                      onChangeEnd: read.isActive
-                          ? (v) => _saveProgress(v.round())
-                          : null,
-                    ),
-                  ),
-
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('Dates', style: textTheme.titleMedium),
-                      ),
-                      TextButton(
-                        onPressed: () => _editDates(read),
-                        child: const Text('Edit'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Expanded(child: Text('Started')),
-                      Text(read.startedAt?.label ?? 'Not set', style: muted),
-                    ],
-                  ),
-                  // Only an ended read has an end date
-                  if (!read.isActive) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            read.status == BookStatus.dnf
-                                ? 'Stopped'
-                                : 'Finished',
-                          ),
-                        ),
-                        Text(read.endedAt?.label ?? 'Not set', style: muted),
                       ],
-                    ),
 
-                    // A new read; this one stays in the history
-                    const SizedBox(height: 24),
-                    OutlinedButton.icon(
-                      onPressed: _startAgain,
-                      icon: const Icon(Icons.replay_rounded),
-                      label: const Text('Start again'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48), // full width
-                      ),
-                    ),
-                  ],
-                ],
-
-                if (hasPages) ...[
-                  const SizedBox(height: 24),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('History', style: textTheme.titleMedium),
-                      ),
-                      TextButton(
-                        onPressed: _addPreviousRead,
-                        child: const Text('Add'),
-                      ),
+                      if (hasPages) ...[
+                        const SizedBox(height: 16),
+                        _SectionCard(
+                          icon: Icons.shelves,
+                          title: 'History',
+                          trailing: TextButton.icon(
+                            onPressed: _addPreviousRead,
+                            icon: const Icon(Icons.add_rounded, size: 20),
+                            label: const Text('Add'),
+                          ),
+                          child: history.isEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 16,
+                                  ),
+                                  child: Text(
+                                    'No past reads',
+                                    textAlign: TextAlign.center,
+                                    style: muted,
+                                  ),
+                                )
+                              : Column(
+                                  children: [
+                                    for (final past in history) ...[
+                                      _HistoryCard(
+                                        read: past,
+                                        onEdit: () => _editPastRead(past),
+                                        onDelete: () => _deletePastRead(past),
+                                      ),
+                                      if (past != history.last)
+                                        const SizedBox(height: 8),
+                                    ],
+                                  ],
+                                ),
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  if (history.isEmpty)
-                    Text('No past reads', style: muted)
-                  else
-                    for (final past in history) ...[
-                      _HistoryCard(
-                        read: past,
-                        onEdit: () => _editPastRead(past),
-                        onDelete: () => _deletePastRead(past),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                ],
+                ),
               ],
             ),
           );
         },
         error: (e, _) => Center(child: Text('Could not load this book: $e')),
         loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+// A bordered white card with an icon in a soft green circle, a title,
+// an optional action on the right, and its content below
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget? trailing;
+  final Widget child;
+
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    this.trailing,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final trailing = this.trailing;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 12, 8, 16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: AppColors.primarySoft,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 22, color: AppColors.primaryDark),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              ?trailing,
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Right padding matches the left, since the card's is smaller
+          // to leave room for the action button
+          Padding(padding: const EdgeInsets.only(right: 4), child: child),
+        ],
+      ),
+    );
+  }
+}
+
+// Small soft green pill, like the progress percent
+class _Pill extends StatelessWidget {
+  final String label;
+
+  const _Pill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: AppColors.primaryDark,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

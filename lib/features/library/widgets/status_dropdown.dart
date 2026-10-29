@@ -44,25 +44,33 @@ class StatusDropdown extends StatelessWidget {
             ),
           ),
       ],
-      child: _StatusPill(
-        label: current?.label ?? 'Add to reading list',
-        active: current != null,
-      ),
+      child: _StatusPill(status: current),
     );
   }
 }
 
 class _StatusPill extends StatelessWidget {
-  final String label;
-  final bool active; // true once the book has a status
-  const _StatusPill({required this.label, required this.active});
+  final BookStatus? status; // null = not on the reading list
+  const _StatusPill({required this.status});
 
   @override
   Widget build(BuildContext context) {
+    final status = this.status;
+    final active = status != null;
     final fg = active ? AppColors.primaryDark : AppColors.textSecondary;
+    final label = status?.label ?? 'Add to reading list';
+
+    final icon = switch (status) {
+      BookStatus.wantToRead => Icons.bookmark_rounded,
+      BookStatus.reading => Icons.auto_stories_rounded,
+      BookStatus.paused => Icons.pause_circle_rounded,
+      BookStatus.finished => Icons.check_circle_rounded,
+      BookStatus.dnf => Icons.cancel_rounded,
+      null => null,
+    };
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+      padding: EdgeInsets.fromLTRB(icon == null ? 16 : 12, 10, 10, 10),
       decoration: BoxDecoration(
         color: active ? AppColors.primarySoft : AppColors.surfaceMuted,
         borderRadius: BorderRadius.circular(999),
@@ -73,6 +81,10 @@ class _StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min, // hug the text, don't stretch
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: 20, color: AppColors.primary),
+            const SizedBox(width: 8),
+          ],
           Text(
             label,
             style: TextStyle(color: fg, fontWeight: FontWeight.w600),

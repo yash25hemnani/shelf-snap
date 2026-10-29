@@ -32,6 +32,17 @@ class ReadingLogsScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          // Hidden while typing, so the keyboard leaves room for results
+          if (MediaQuery.viewInsetsOf(context).bottom == 0)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              // Full width; the height follows the image's shape
+              child: Image.asset(
+                'assets/images/reading.png',
+                width: double.infinity,
+                fit: BoxFit.fitWidth,
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
