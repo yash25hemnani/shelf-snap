@@ -44,25 +44,61 @@ class ReadingLogRepository {
         );
   }
 
-  // Deletes a book's log and its read. Firestore doesn't delete
-  // subcollections with their parent, so the read goes first.
+  Stream<List<ReadingLogModel>> searchLogs(
+    String userId,
+    String token, {
+    BookStatus? status,
+    int limit = 50,
+  }) {
+    Query<Map<String, dynamic>> query = _logs(
+      userId,
+    ).where('searchTokens', arrayContains: token);
+
+    if (status != null) {
+      query = query.where('status', isEqualTo: status.name);
+    }
+
+    return query
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => ReadingLogModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  Stream<List<ReadModel>> watchReads(String userId, String readingKey) {
+    return _reads(userId, readingKey)
+        .orderBy('endedAt', descending: true)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => ReadModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  // Deletes a book's log and every read. Firestore doesn't delete
+  // subcollections with their parent, so each read is deleted too.
+  // A batch removes them all together, or none if it fails.
   Future<void> deleteLog(String readingKey, String userId) async {
     final logRef = _logs(userId).doc(readingKey);
+    final readsSnap = await _reads(userId, readingKey).get();
 
-    await _db.runTransaction((tx) async {
-      final logDoc = await tx.get(logRef);
-      if (!logDoc.exists) return;
+    final batch = _db.batch();
+    for (final doc in readsSnap.docs) {
+      batch.delete(doc.reference);
+    }
+    batch.delete(logRef);
 
-      final readId = logDoc.data()!['latestReadId'] as String?;
-      if (readId != null) {
-        tx.delete(_reads(userId, readingKey).doc(readId));
-      }
-      tx.delete(logRef);
-    });
+    await batch.commit();
   }
 
   // Moves a book to [next], creating its log and read when needed.
-  // Moving back to want to read once a read exists is blocked and does nothing.
+  // Moving a reading or paused book back to want to read deletes its read;
+  // a finished or DNF book can't go back, and nothing is saved.
   // Returns true when something was saved.
   Future<bool> updateStatus(
     BookStatus nextStatus,
@@ -132,6 +168,19 @@ class ReadingLogRepository {
 
         return true;
       } else {
+        // Back to want to read: the book wasn't really started, so the
+        // read is deleted. An ended read is history and stays.
+        if (nextStatus == BookStatus.wantToRead) {
+          if (!readModel.isActive) return false; // blocked
+
+          tx.delete(readDoc!.reference);
+          tx.set(
+            logRef,
+            log.copyWith(status: nextStatus, clearLatestRead: true).toMap(),
+          );
+          return true;
+        }
+
         // When model is not null
         final updatedModel = readModel.withStatus(nextStatus);
         if (identical(updatedModel, readModel)) return false; // blocked
@@ -144,6 +193,27 @@ class ReadingLogRepository {
         );
         return true;
       }
+    });
+  }
+
+  // Sets the book's page count on the log, for books Google Books had none for
+  Future<void> updatePageCount(
+    int pageCount,
+    String readingKey,
+    String userId,
+  ) async {
+    if (pageCount <= 0) throw ArgumentError('Invalid page count: $pageCount');
+
+    final logRef = _logs(userId).doc(readingKey);
+
+    await _db.runTransaction((tx) async {
+      final logDoc = await tx.get(logRef);
+      if (!logDoc.exists) return;
+
+      final log = ReadingLogModel.fromMap(logDoc.id, logDoc.data()!);
+      if (log.pageCount == pageCount) return; // no change
+
+      tx.update(logRef, log.copyWith(pageCount: pageCount).toMap());
     });
   }
 
@@ -220,6 +290,111 @@ class ReadingLogRepository {
 
       // copy to the log
       tx.update(logRef, log.copyWith(latestRead: updatedModel).toMap());
+    });
+  }
+
+  Future<void> startAgain(String readingKey, String userId) async {
+    final logRef = _logs(userId).doc(readingKey);
+    final reads = _reads(userId, readingKey);
+
+    await _db.runTransaction((tx) async {
+      final logDoc = await tx.get(logRef);
+      if (!logDoc.exists) return;
+      final log = ReadingLogModel.fromMap(logDoc.id, logDoc.data()!);
+
+      // Only after an ended read
+      final latest = log.latestRead;
+      if (latest == null || latest.isActive) return;
+
+      final readRef = reads.doc(); // new id
+      final newRead = ReadModel(id: readRef.id, userId: userId);
+
+      tx.set(readRef, newRead.toMap());
+      tx.update(
+        logRef,
+        log.copyWith(status: newRead.status, latestRead: newRead).toMap(),
+      );
+    });
+  }
+
+  Future<void> addPreviousRead(
+    ReadDate? start,
+    ReadDate end,
+    String readingKey,
+    String userId,
+  ) async {
+    final logRef = _logs(userId).doc(readingKey);
+    final readRef = _reads(userId, readingKey).doc();
+
+    final emptyModel = ReadModel(
+      id: readRef.id,
+      userId: userId,
+      status: BookStatus.finished,
+    );
+
+    final read = emptyModel.withDates(start, end);
+    // withDates returns the same model when the dates break a rule
+    if (identical(read, emptyModel)) throw ArgumentError('Invalid dates');
+
+    await _db.runTransaction((tx) async {
+      final logDoc = await tx.get(logRef);
+      if (!logDoc.exists) return;
+
+      final log = ReadingLogModel.fromMap(logDoc.id, logDoc.data()!);
+
+      tx.set(readRef, read.toMap());
+
+      // A want to read book has no read yet, so this one becomes the latest.
+      // Otherwise the current read stays the main one.
+      if (log.latestRead == null) {
+        tx.update(
+          logRef,
+          log.copyWith(status: read.status, latestRead: read).toMap(),
+        );
+      }
+    });
+  }
+
+  Future<void> updateReadDates(
+    ReadDate? start,
+    ReadDate? end,
+    String readId,
+    String readingKey,
+    String userId,
+  ) async {
+    final readRef = _reads(userId, readingKey).doc(readId);
+
+    await _db.runTransaction((tx) async {
+      final readDoc = await tx.get(readRef);
+      if (!readDoc.exists) return;
+
+      final readModel = ReadModel.fromMap(readDoc.id, readDoc.data()!);
+
+      final updatedModel = readModel.withDates(start, end);
+
+      if (identical(readModel, updatedModel)) return; // invalid or no change
+
+      tx.update(readRef, updatedModel.toMap());
+    });
+  }
+
+  // Deletes one read from the history. The latest read is skipped,
+  // since the log would point at a read that's gone.
+  Future<void> deletePastRead(
+    String readId,
+    String readingKey,
+    String userId,
+  ) async {
+    final logRef = _logs(userId).doc(readingKey);
+
+    await _db.runTransaction((tx) async {
+      final logDoc = await tx.get(logRef);
+      if (!logDoc.exists) return;
+
+      final log = ReadingLogModel.fromMap(logDoc.id, logDoc.data()!);
+      if (log.latestRead?.id == readId) return;
+
+      tx.delete(_reads(userId, readingKey).doc(readId));
     });
   }
 }

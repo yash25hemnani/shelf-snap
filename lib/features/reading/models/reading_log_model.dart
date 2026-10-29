@@ -83,7 +83,26 @@ class ReadingLogModel {
     'latestRead': latestRead?.toMap(),
     'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
     'updatedAt': Timestamp.now(),
+    // Worked out on every save, so old logs get tokens on their next write
+    'searchTokens': searchTokens,
   };
+
+  // Word prefixes of the title and authors, the same as BookModel's.
+  // "Harry Potter" → ha, har, harr, harry, po, pot, ...
+  List<String> get searchTokens {
+    final text = [
+      if (title != BookModel.unknownTitle) title,
+      ...authors,
+    ].join(' ');
+
+    final tokens = <String>{};
+    for (final word in BookModel.sanitizeWords(text)) {
+      for (var i = BookModel.searchTokenMin; i <= word.length; i++) {
+        tokens.add(word.substring(0, i));
+      }
+    }
+    return tokens.toList();
+  }
 
   // Reading or paused: the latest read is still going
   bool get hasActiveRead =>

@@ -8,6 +8,7 @@ import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
 import 'package:shelf_snap/features/reading/models/read_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
+import 'package:shelf_snap/features/reading/widgets/edit_dates_sheet.dart';
 import 'package:shelf_snap/features/reading/widgets/number_dialog.dart';
 
 // One book on the reading list: status, progress and dates of the latest read
@@ -22,6 +23,9 @@ class ReadingLogDetailScreen extends ConsumerStatefulWidget {
 
 class _ReadingLogDetailScreenState
     extends ConsumerState<ReadingLogDetailScreen> {
+  // The page under the slider while dragging; null shows the saved page
+  int? _dragPage;
+
   Future<void> _onStatusChanged(ReadingLogModel log, BookStatus status) async {
     final userId = AuthService().currentUser?.uid;
     if (userId == null || status == log.status) return;
@@ -44,25 +48,21 @@ class _ReadingLogDetailScreenState
         messenger.showMessage("Can't move this book back to ${status.label}");
       }
     } catch (e) {
+      debugPrint('updateStatus failed: $e');
       messenger.showError("Couldn't update status, check your connection");
     }
   }
 
-  // Pages when the book has a page count, otherwise a percent
-  Future<void> _editProgress(ReadingLogModel log, ReadModel read) async {
+  // Set or fix the book's page count; 0 from Google Books counts as missing
+  Future<void> _editPageCount(ReadingLogModel log) async {
     final userId = AuthService().currentUser?.uid;
     if (userId == null) return;
 
-    final pageCount = log.pageCount;
-    final usePages = pageCount != null && pageCount > 0;
-    final unit = usePages ? ProgressUnit.pages : ProgressUnit.percent;
-
+    final current = log.pageCount;
     final value = await showNumberDialog(
       context,
-      title: usePages ? 'Current page' : 'Percent read',
-      // Only prefill when the saved value is in the same unit
-      initial: read.progressUnit == unit ? read.progressValue : null,
-      max: usePages ? pageCount : 100,
+      title: 'Page count',
+      initial: current != null && current > 0 ? current : null,
     );
     if (value == null || !mounted) return;
 
@@ -70,9 +70,225 @@ class _ReadingLogDetailScreenState
     try {
       await ref
           .read(readingLogRepositoryProvider)
-          .updateProgess(value, unit, widget.readingKey, userId);
+          .updatePageCount(value, widget.readingKey, userId);
     } catch (e) {
+      debugPrint('updatePageCount failed: $e');
+      messenger.showError("Couldn't save page count, check your connection");
+    }
+  }
+
+  // Progress is always in pages, since the page count is required first
+  Future<void> _saveProgress(int page) async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .updateProgess(page, ProgressUnit.pages, widget.readingKey, userId);
+    } catch (e) {
+      debugPrint('updateProgess failed: $e');
       messenger.showError("Couldn't save progress, check your connection");
+    } finally {
+      // The saved value comes back through the stream
+      if (mounted) setState(() => _dragPage = null);
+    }
+  }
+
+  // Type an exact page, for when dragging is too rough
+  Future<void> _editProgress(int currentPage, int pageCount) async {
+    final value = await showNumberDialog(
+      context,
+      title: 'Current page',
+      initial: currentPage,
+      min: 0,
+      max: pageCount,
+    );
+    if (value == null || !mounted) return;
+    await _saveProgress(value);
+  }
+
+  Future<void> _editDates(ReadModel read) async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    final result = await showEditDatesSheet(context, read);
+    if (result == null || !mounted) return; // cancelled
+
+    final (start, end) = result;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .updateDates(start, end, widget.readingKey, userId);
+    } catch (e) {
+      debugPrint('updateDates failed: $e');
+      messenger.showError("Couldn't save dates, check your connection");
+    }
+  }
+
+  // A read from the history; it has no copy on the log
+  Future<void> _editPastRead(ReadModel read) async {
+    final userId = AuthService().currentUser?.uid;
+    final readId = read.id;
+    if (userId == null || readId == null) return;
+
+    final result = await showEditDatesSheet(
+      context,
+      read,
+      title: 'Edit previous read',
+    );
+    if (result == null || !mounted) return; // cancelled
+
+    final (start, end) = result;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .updateReadDates(start, end, readId, widget.readingKey, userId);
+    } catch (e) {
+      debugPrint('updateReadDates failed: $e');
+      messenger.showError("Couldn't save the read, check your connection");
+    }
+  }
+
+  Future<void> _deletePastRead(ReadModel read) async {
+    final userId = AuthService().currentUser?.uid;
+    final readId = read.id;
+    if (userId == null || readId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete this read?'),
+        content: const Text('It will be removed from your history.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .deletePastRead(readId, widget.readingKey, userId);
+      messenger.showMessage('Read deleted');
+    } catch (e) {
+      debugPrint('deletePastRead failed: $e');
+      messenger.showError("Couldn't delete the read, check your connection");
+    }
+  }
+
+  // A new read from page 0; the ended one stays as history
+  Future<void> _startAgain() async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Start again?'),
+        content: const Text(
+          'A new read starts from page 0. This one is kept in your history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Start again'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .startAgain(widget.readingKey, userId);
+      messenger.showMessage('Started a new read');
+    } catch (e) {
+      debugPrint('startAgain failed: $e');
+      messenger.showError("Couldn't start again, check your connection");
+    }
+  }
+
+  // A finished read from before, added to the history
+  Future<void> _addPreviousRead() async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    // An empty finished read, so the sheet asks for both dates
+    final result = await showEditDatesSheet(
+      context,
+      ReadModel(userId: userId, status: BookStatus.finished),
+      title: 'Add previous read',
+    );
+    if (result == null || !mounted) return; // cancelled
+
+    final (start, end) = result;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .addPreviousRead(start, end!, widget.readingKey, userId);
+      messenger.showMessage('Previous read added');
+    } catch (e) {
+      debugPrint('addPreviousRead failed: $e');
+      messenger.showError("Couldn't add the read, check your connection");
+    }
+  }
+
+  Future<void> _confirmDelete() async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Remove from reading list?'),
+        content: const Text('Its progress and dates will be deleted.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .deleteLog(widget.readingKey, userId);
+      navigator.pop();
+      messenger.showMessage('Removed from reading list');
+    } catch (e) {
+      debugPrint('deleteLog failed: $e');
+      messenger.showError("Couldn't delete, check your connection");
     }
   }
 
@@ -83,9 +299,43 @@ class _ReadingLogDetailScreenState
       color: AppColors.textSecondary,
     );
     final logAsync = ref.watch(readingLogProvider(widget.readingKey));
+    final reads = ref.watch(readsProvider(widget.readingKey)).valueOrNull;
 
     return Scaffold(
-      appBar: AppBar(),
+      appBar: AppBar(
+        title: const Text('Reading log'),
+        titleTextStyle: textTheme.titleMedium,
+        titleSpacing: 0,
+        actions: [
+          PopupMenuButton<void>(
+            itemBuilder: (_) => [
+              PopupMenuItem(
+                onTap: _addPreviousRead,
+                child: const ListTile(
+                  leading: Icon(Icons.history_rounded),
+                  title: Text('Add previous read'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+              PopupMenuItem(
+                onTap: _confirmDelete,
+                child: const ListTile(
+                  leading: Icon(
+                    Icons.delete_outline_rounded,
+                    color: AppColors.error,
+                  ),
+                  title: Text(
+                    'Delete',
+                    style: TextStyle(color: AppColors.error),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: logAsync.when(
         data: (log) {
           // Deleted while open, or never saved
@@ -99,6 +349,26 @@ class _ReadingLogDetailScreenState
           }
 
           final read = log.latestRead;
+          // Google Books sends 0 when it doesn't know, so that counts as missing.
+          // Progress, dates and history stay hidden until it's added.
+          final hasPages = (log.pageCount ?? 0) > 0;
+          final pageCount = log.pageCount ?? 0;
+
+          // The page to show: finished is the last page; old percent
+          // progress is turned into a page; the drag wins while moving
+          var savedPage = 0;
+          if (read != null && hasPages) {
+            savedPage = read.status == BookStatus.finished
+                ? pageCount
+                : read.progressUnit == ProgressUnit.percent
+                ? (read.progressValue * pageCount / 100).round()
+                : read.progressValue;
+          }
+          final currentPage = (_dragPage ?? savedPage).clamp(0, pageCount);
+          // The current read is shown above, so history is the rest
+          final history = (reads ?? const <ReadModel>[])
+              .where((r) => r.id != read?.id)
+              .toList();
           final coverUrl = log.coverUrl;
           const placeholder = ColoredBox(
             color: AppColors.surfaceMuted,
@@ -142,8 +412,24 @@ class _ReadingLogDetailScreenState
                                 : log.authors.join(', '),
                             style: muted,
                           ),
-                          if (log.pageCount != null)
-                            Text('${log.pageCount} pages', style: muted),
+                          if (hasPages)
+                            // Tap the row to fix a wrong page count
+                            InkWell(
+                              onTap: () => _editPageCount(log),
+                              borderRadius: BorderRadius.circular(8),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('${log.pageCount} pages', style: muted),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.edit_outlined,
+                                    size: 16,
+                                    color: AppColors.hint,
+                                  ),
+                                ],
+                              ),
+                            ),
                           const SizedBox(height: 12),
                           StatusDropdown(
                             value: log.status,
@@ -156,8 +442,13 @@ class _ReadingLogDetailScreenState
                   ],
                 ),
 
+                if (!hasPages) ...[
+                  const SizedBox(height: 24),
+                  _MissingPagesCard(onAdd: () => _editPageCount(log)),
+                ],
+
                 // Want to read has no read, so no progress or dates
-                if (read != null) ...[
+                if (hasPages && read != null) ...[
                   const SizedBox(height: 24),
                   Row(
                     children: [
@@ -167,31 +458,60 @@ class _ReadingLogDetailScreenState
                       // Only a reading or paused read takes progress
                       if (read.isActive)
                         TextButton(
-                          onPressed: () => _editProgress(log, read),
+                          onPressed: () =>
+                              _editProgress(currentPage, pageCount),
                           child: const Text('Update'),
                         ),
                     ],
                   ),
                   const SizedBox(height: 8),
-                  Text(switch (read.progressUnit) {
-                    ProgressUnit.percent => '${read.progressValue}%',
-                    ProgressUnit.pages =>
-                      log.pageCount == null
-                          ? 'Page ${read.progressValue}'
-                          : 'Page ${read.progressValue} of ${log.pageCount}',
-                  }, style: muted),
-                  const SizedBox(height: 8),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      value: read.fraction(log.pageCount) ?? 0,
-                      minHeight: 6,
-                      backgroundColor: AppColors.surfaceMuted,
+                  Text(
+                    read.status == BookStatus.finished
+                        ? 'Finished · $pageCount pages'
+                        : 'Page $currentPage of $pageCount · '
+                              '${(currentPage * 100 / pageCount).round()}%',
+                    style: muted,
+                  ),
+                  const SizedBox(height: 4),
+                  // Drag to move the page; saved when the finger lifts.
+                  // Finished and DNF reads show it but can't be dragged.
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 6,
+                      activeTrackColor: AppColors.primary,
+                      inactiveTrackColor: AppColors.surfaceMuted,
+                      thumbColor: AppColors.primary,
+                      disabledActiveTrackColor: AppColors.primary,
+                      disabledInactiveTrackColor: AppColors.surfaceMuted,
+                      disabledThumbColor: AppColors.primary,
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 16,
+                      ),
+                    ),
+                    child: Slider(
+                      value: currentPage.toDouble(),
+                      max: pageCount.toDouble(),
+                      onChanged: read.isActive
+                          ? (v) => setState(() => _dragPage = v.round())
+                          : null,
+                      onChangeEnd: read.isActive
+                          ? (v) => _saveProgress(v.round())
+                          : null,
                     ),
                   ),
 
                   const SizedBox(height: 24),
-                  Text('Dates', style: textTheme.titleMedium),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Dates', style: textTheme.titleMedium),
+                      ),
+                      TextButton(
+                        onPressed: () => _editDates(read),
+                        child: const Text('Edit'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -214,7 +534,45 @@ class _ReadingLogDetailScreenState
                         Text(read.endedAt?.label ?? 'Not set', style: muted),
                       ],
                     ),
+
+                    // A new read; this one stays in the history
+                    const SizedBox(height: 24),
+                    OutlinedButton.icon(
+                      onPressed: _startAgain,
+                      icon: const Icon(Icons.replay_rounded),
+                      label: const Text('Start again'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48), // full width
+                      ),
+                    ),
                   ],
+                ],
+
+                if (hasPages) ...[
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('History', style: textTheme.titleMedium),
+                      ),
+                      TextButton(
+                        onPressed: _addPreviousRead,
+                        child: const Text('Add'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (history.isEmpty)
+                    Text('No past reads', style: muted)
+                  else
+                    for (final past in history) ...[
+                      _HistoryCard(
+                        read: past,
+                        onEdit: () => _editPastRead(past),
+                        onDelete: () => _deletePastRead(past),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
                 ],
               ],
             ),
@@ -222,6 +580,138 @@ class _ReadingLogDetailScreenState
         },
         error: (e, _) => Center(child: Text('Could not load this book: $e')),
         loading: () => const Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+// Shown instead of progress, dates and history until the page count is added
+class _MissingPagesCard extends StatelessWidget {
+  final VoidCallback onAdd;
+
+  const _MissingPagesCard({required this.onAdd});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.warningSoft,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline_rounded, color: AppColors.warning),
+              const SizedBox(width: 8),
+              Text('Page count missing', style: textTheme.titleSmall),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            "We couldn't find how many pages this book has. "
+            'Add it to track your progress.',
+            style: textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          FilledButton(onPressed: onAdd, child: const Text('Add page count')),
+        ],
+      ),
+    );
+  }
+}
+
+// One past read: how it ended and when. Tap to edit, or use the menu.
+class _HistoryCard extends StatelessWidget {
+  final ReadModel read;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  const _HistoryCard({
+    required this.read,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final finished = read.status == BookStatus.finished;
+
+    // Material + InkWell so the tap ripple stays inside the rounded border
+    return Material(
+      color: AppColors.background,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: InkWell(
+        onTap: onEdit,
+        child: Padding(
+          // Less on the right, since the menu button has its own padding
+          padding: const EdgeInsets.fromLTRB(12, 12, 0, 12),
+          child: Row(
+            children: [
+              Icon(
+                finished ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                color: finished ? AppColors.primary : AppColors.hint,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(read.status.label, style: textTheme.titleSmall),
+                    Text(
+                      '${read.startedAt?.label ?? 'No start date'}'
+                      ' – ${read.endedAt?.label ?? 'Now'}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuButton<void>(
+                icon: const Icon(
+                  Icons.more_vert_rounded,
+                  color: AppColors.hint,
+                ),
+                itemBuilder: (_) => [
+                  PopupMenuItem(
+                    onTap: onEdit,
+                    child: const ListTile(
+                      leading: Icon(Icons.edit_outlined),
+                      title: Text('Edit'),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  PopupMenuItem(
+                    onTap: onDelete,
+                    child: const ListTile(
+                      leading: Icon(
+                        Icons.delete_outline_rounded,
+                        color: AppColors.error,
+                      ),
+                      title: Text(
+                        'Delete',
+                        style: TextStyle(color: AppColors.error),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
