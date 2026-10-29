@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/widgets/clay_avatar.dart';
 import 'package:shelf_snap/features/profile/models/user_model.dart';
 
-// Round avatar: the user's initial underneath, their photo on top once it loads
+// Round avatar: the user's photo if they have one, otherwise their clay avatar
 class UserAvatar extends StatelessWidget {
   final UserModel user;
   final double radius;
@@ -11,26 +12,17 @@ class UserAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = user.name.isNotEmpty ? user.name[0].toUpperCase() : '?';
+    // Older accounts have no saved seed, so the uid keeps their avatar stable
+    final clay = ClayAvatar(seed: user.avatarSeed ?? user.uid, radius: radius);
 
-    // Sum of the uid's characters picks the colour, so it's the same everywhere
-    final sum = user.uid.codeUnits.fold(0, (a, b) => a + b);
-    final colors = AppColors.avatarColors[sum % AppColors.avatarColors.length];
+    if (user.photoUrl == null) return clay;
 
+    // Clay shows underneath until the photo loads
     return CircleAvatar(
       radius: radius,
-      backgroundColor: colors[1],
-      foregroundImage: user.photoUrl != null
-          ? NetworkImage(user.photoUrl!)
-          : null,
-      child: Text(
-        initial,
-        style: TextStyle(
-          fontSize: radius * 0.8,
-          fontWeight: FontWeight.w600,
-          color: colors[0],
-        ),
-      ),
+      backgroundColor: AppColors.surfaceMuted,
+      foregroundImage: NetworkImage(user.photoUrl!),
+      child: clay,
     );
   }
 }

@@ -6,6 +6,7 @@ class UserModel {
   final String name;
   final String email; // stored lowercase
   final String? photoUrl;
+  final String? avatarSeed;
   final DateTime createdAt;
 
   const UserModel({
@@ -14,6 +15,7 @@ class UserModel {
     required this.name,
     required this.email,
     this.photoUrl,
+    this.avatarSeed,
     required this.createdAt,
   });
 
@@ -23,6 +25,7 @@ class UserModel {
     'name': name,
     'email': email,
     'photoUrl': photoUrl,
+    'avatarSeed': avatarSeed,
     'createdAt': Timestamp.fromDate(createdAt),
   };
 
@@ -37,6 +40,7 @@ class UserModel {
       name: (name == null || name.isEmpty) ? username : name,
       email: map['email'] as String? ?? '',
       photoUrl: map['photoUrl'] as String?,
+      avatarSeed: map['avatarSeed'] as String?,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }

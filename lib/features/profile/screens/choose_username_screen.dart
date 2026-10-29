@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/widgets/clay_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/profile/models/user_model.dart';
 import 'package:shelf_snap/features/profile/providers/user_provider.dart';
@@ -22,6 +23,15 @@ class _ChooseUsernameScreenState extends ConsumerState<ChooseUsernameScreen> {
   final _nameController = TextEditingController();
 
   bool _isLoading = false;
+  late final List<String> _seeds;
+  int _selected = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = AuthService().currentUser!.uid;
+    _seeds = List.generate(8, (i) => '${uid}_$i');
+  }
 
   @override
   void dispose() {
@@ -51,6 +61,7 @@ class _ChooseUsernameScreenState extends ConsumerState<ChooseUsernameScreen> {
               username: username,
               name: _nameController.text.trim(),
               email: (user.email ?? '').toLowerCase(),
+              avatarSeed: _seeds[_selected],
               createdAt: DateTime.now(),
             ),
           );
@@ -70,10 +81,7 @@ class _ChooseUsernameScreenState extends ConsumerState<ChooseUsernameScreen> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: AppColors.error,
-        ),
+        SnackBar(content: Text(message), backgroundColor: AppColors.error),
       );
   }
 
@@ -114,6 +122,32 @@ class _ChooseUsernameScreenState extends ConsumerState<ChooseUsernameScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (var i = 0; i < _seeds.length; i++)
+                        GestureDetector(
+                          onTap: () => setState(() => _selected = i),
+                          // Every avatar has a ring so the picked one doesn't change size
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: i == _selected
+                                    ? AppColors.primary
+                                    : AppColors.background,
+                                width: 3,
+                              ),
+                            ),
+                            child: ClayAvatar(seed: _seeds[i], radius: 28),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
                   TextFormField(
                     controller: _usernameController,
                     validator: UserModel.validateUsername,
@@ -124,13 +158,6 @@ class _ChooseUsernameScreenState extends ConsumerState<ChooseUsernameScreen> {
                     decoration: const InputDecoration(
                       hintText: 'username',
                       prefixIcon: Icon(Icons.alternate_email_rounded),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6, left: 4),
-                    child: Text(
-                      'Letters, numbers, . and _',
-                      style: text.bodySmall?.copyWith(color: AppColors.hint),
                     ),
                   ),
                   const SizedBox(height: 12),

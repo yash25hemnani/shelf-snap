@@ -6,6 +6,7 @@ import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/profile/providers/user_provider.dart';
+import 'package:shelf_snap/features/profile/screens/edit_profile_screen.dart';
 import 'package:shelf_snap/features/reading/screens/reading_logs_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -57,112 +58,100 @@ class ProfileScreen extends ConsumerWidget {
         toolbarHeight: 64,
         titleTextStyle: theme.textTheme.headlineMedium,
         title: const Text('Profile'),
+        actions: [
+          if (profile != null)
+            IconButton(
+              tooltip: 'Edit profile',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(profile: profile),
+                ),
+              ),
+            ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: ListView(
         // Extra bottom space so the last item clears the navbar
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
         children: [
-          // Avatar with the name and @username beside it
-          SizedBox(
-            height: 64,
-            child: profile == null
-                ? null
-                : Row(
-                    children: [
-                      UserAvatar(user: profile, radius: 32),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              profile.name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleLarge,
-                            ),
-                            Text(
-                              '@${profile.username}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-          ),
-          const SizedBox(height: 20),
-
-          // Libraries, Books and Friends in one card
-          _Card(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-            // Lets the dividers stretch to the height of the stats
-            child: IntrinsicHeight(
-              child: Row(
-                children: [
-                  _Stat(
-                    value: librariesAsync.valueOrNull?.length,
-                    label: 'Libraries',
-                  ),
-                  const VerticalDivider(width: 1, color: AppColors.border),
-                  _Stat(
-                    // Libraries store their own counts, so no extra reads
-                    value: librariesAsync.valueOrNull?.fold<int>(
-                      0,
-                      (sum, library) => sum + library.bookCount,
-                    ),
-                    label: 'Books',
-                  ),
-                  const VerticalDivider(width: 1, color: AppColors.border),
-                  // Shows "–" until friends exist
-                  const _Stat(label: 'Friends'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _Card(
-            child: Column(
+          // Centred avatar with the name and @username below it
+          if (profile != null)
+            Column(
               children: [
-                // Opens the reading list until the stats screen exists
-                _MenuRow(
-                  icon: Icons.insights_rounded,
-                  label: 'Reading Stats',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ReadingLogsScreen(),
-                    ),
+                UserAvatar(user: profile, radius: 40),
+                const SizedBox(height: 12),
+                Text(
+                  profile.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleLarge,
+                ),
+                Text(
+                  '@${profile.username}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: AppColors.textSecondary,
                   ),
-                ),
-                const Divider(height: 1, indent: 68, color: AppColors.border),
-                _MenuRow(
-                  icon: Icons.people_alt_outlined,
-                  label: 'Friends',
-                  onTap: () => _comingSoon(context),
-                ),
-                const Divider(height: 1, indent: 68, color: AppColors.border),
-                _MenuRow(
-                  icon: Icons.settings_outlined,
-                  label: 'Settings',
-                  onTap: () => _comingSoon(context),
                 ),
               ],
             ),
+          const SizedBox(height: 24),
+
+          // Libraries, Books and Friends, each in its own card
+          Row(
+            children: [
+              _Stat(
+                value: librariesAsync.valueOrNull?.length,
+                label: 'Libraries',
+              ),
+              const SizedBox(width: 8),
+              _Stat(
+                // Libraries store their own counts, so no extra reads
+                value: librariesAsync.valueOrNull?.fold<int>(
+                  0,
+                  (sum, library) => sum + library.bookCount,
+                ),
+                label: 'Books',
+              ),
+              const SizedBox(width: 8),
+              // Shows "–" until friends exist
+              const _Stat(label: 'Friends'),
+            ],
           ),
           const SizedBox(height: 24),
 
-          OutlinedButton.icon(
+          // Opens the reading list until the stats screen exists
+          _MenuRow(
+            icon: Icons.insights_rounded,
+            label: 'Reading Stats',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReadingLogsScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _MenuRow(
+            icon: Icons.people_alt_outlined,
+            label: 'Friends',
+            onTap: () => _comingSoon(context),
+          ),
+          const SizedBox(height: 8),
+          _MenuRow(
+            icon: Icons.settings_outlined,
+            label: 'Settings',
+            onTap: () => _comingSoon(context),
+          ),
+          const SizedBox(height: 16),
+
+          TextButton.icon(
             onPressed: () => _confirmSignOut(context),
             icon: const Icon(Icons.logout_rounded),
             label: const Text('Sign out'),
-            style: OutlinedButton.styleFrom(
+            style: TextButton.styleFrom(
               foregroundColor: AppColors.error,
               minimumSize: const Size.fromHeight(52), // full width
             ),
@@ -195,7 +184,7 @@ class _Card extends StatelessWidget {
   }
 }
 
-// One number over its label; null shows "–"
+// A card with one number over its label; null shows "–"
 class _Stat extends StatelessWidget {
   final int? value;
   final String label;
@@ -207,22 +196,25 @@ class _Stat extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Expanded(
-      child: Column(
-        children: [
-          Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppColors.textSecondary,
+      child: _Card(
+        padding: const EdgeInsets.symmetric(vertical: 32),
+        child: Column(
+          children: [
+            Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
+            Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-// Icon in a soft square, a label and a chevron
+// Full-width card with an icon in a soft square, a label and a chevron
 class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -236,19 +228,25 @@ class _MenuRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppColors.primarySoft,
-          borderRadius: BorderRadius.circular(12),
+    return _Card(
+      child: ListTile(
+        onTap: onTap,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.primarySoft,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, size: 20, color: AppColors.primaryDark),
         ),
-        child: Icon(icon, size: 20, color: AppColors.primaryDark),
+        title: Text(label),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppColors.hint,
+        ),
       ),
-      title: Text(label),
-      trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.hint),
     );
   }
 }

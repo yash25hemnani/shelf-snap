@@ -25,6 +25,34 @@ class UserRepository {
     });
   }
 
+  Future<void> updateProfile(
+    UserModel user, {
+    required String username,
+    required String avatarSeed,
+  }) async {
+    final newUsernameRef = _db.collection('usernames').doc(username);
+    final oldUsernameRef = _db.collection('usernames').doc(user.username);
+
+    final userRef = _db.collection('users').doc(user.uid);
+
+    if (UserModel.validateUsername(username) != null) {
+      throw ArgumentError('Invalid username: $username');
+    }
+
+    await _db.runTransaction((tx) async {
+      // Only move the reservation when the name changed
+      if (username != user.username) {
+        final taken = await tx.get(newUsernameRef);
+        if (taken.exists) throw UsernameTakenException();
+
+        tx.delete(oldUsernameRef);
+        tx.set(newUsernameRef, {'uid': user.uid});
+      }
+
+      tx.update(userRef, {'username': username, 'avatarSeed': avatarSeed});
+    });
+  }
+
   Stream<UserModel?> watchUser(String uid) {
     return _db.collection('users').doc(uid).snapshots().map((snap) {
       if (!snap.exists) return null;
@@ -41,9 +69,8 @@ class UserRepository {
         .where(FieldPath.documentId, whereIn: uids)
         .snapshots()
         .map(
-          (snap) => snap.docs
-              .map((d) => UserModel.fromMap(d.id, d.data()))
-              .toList(),
+          (snap) =>
+              snap.docs.map((d) => UserModel.fromMap(d.id, d.data())).toList(),
         );
   }
 
