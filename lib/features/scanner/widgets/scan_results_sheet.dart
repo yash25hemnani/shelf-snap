@@ -20,10 +20,8 @@ class ScanResultsSheet extends ConsumerWidget {
 
       if (saved != true || !context.mounted) return;
 
+      // The dialog already showed what was saved
       ref.read(scanSessionProvider.notifier).removeAll(results);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Saved ${results.length} books')));
     }
 
     return SafeArea(

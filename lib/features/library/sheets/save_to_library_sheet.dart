@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 
 class SaveToLibrarySheet extends ConsumerStatefulWidget {
   final BookModel book;
@@ -32,8 +34,14 @@ class _SaveToLibrarySheetState extends ConsumerState<SaveToLibrarySheet> {
       _isSaving = true;
     });
 
+    // Captured now: the sheet closes before the message shows
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
-      await ref.read(libraryRepositoryProvider).addBooks(id, [widget.book]);
+      final result = await ref.read(libraryRepositoryProvider).addBooks(id, [
+        widget.book,
+      ]);
+      messenger.showMessage(LibraryRepository.savedMessage(result));
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (e) {

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 
 class SaveToLibraryDialog extends ConsumerStatefulWidget {
   final List<BookModel> books;
@@ -24,8 +26,14 @@ class _SaveToLibraryDialogState extends ConsumerState<SaveToLibraryDialog> {
       _isSaving = true;
     });
 
+    // Captured now: the dialog closes before the message shows
+    final messenger = ScaffoldMessenger.of(context);
+
     try {
-      await ref.read(libraryRepositoryProvider).addBooks(id, widget.books);
+      final result = await ref
+          .read(libraryRepositoryProvider)
+          .addBooks(id, widget.books);
+      messenger.showMessage(LibraryRepository.savedMessage(result));
       if (!mounted) return;
       Navigator.pop(context, true); // tell the caller it worked
     } catch (e) {

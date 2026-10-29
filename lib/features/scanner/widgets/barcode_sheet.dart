@@ -4,6 +4,7 @@ import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 import 'package:shelf_snap/features/library/widgets/library_picker_bar.dart';
 import 'package:shelf_snap/features/scanner/models/barcode_hit.dart';
 import 'package:shelf_snap/features/scanner/providers/barcode_session_provider.dart';
@@ -41,15 +42,16 @@ class _BarcodeSheetState extends ConsumerState<BarcodeSheet> {
     setState(() => _isSaving = true);
 
     try {
-      await ref.read(libraryRepositoryProvider).addBooks(libraryId, [
-        for (final hit in hits) hit.book!,
-      ]);
+      final result = await ref.read(libraryRepositoryProvider).addBooks(
+        libraryId,
+        [for (final hit in hits) hit.book!],
+      );
 
       final notifier = ref.read(barcodeSessionProvider.notifier);
       for (final hit in hits) {
         notifier.remove(hit.isbn);
       }
-      messenger.showMessage('Saved ${hits.length} books');
+      messenger.showMessage(LibraryRepository.savedMessage(result));
       if (mounted) Navigator.pop(context);
     } catch (e) {
       messenger.showError('Could not save: $e');

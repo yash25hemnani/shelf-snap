@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 
 class AddBookForm extends ConsumerStatefulWidget {
   final String libraryId;
@@ -47,9 +49,12 @@ class _AddBookFormState extends ConsumerState<AddBookForm> {
     );
 
     setState(() => _isSaving = true);
+    // Captured now: the form closes before the message shows
+    final messenger = ScaffoldMessenger.of(context);
 
     try {
-      await repository.addBook(widget.libraryId, book);
+      final result = await repository.addBooks(widget.libraryId, [book]);
+      messenger.showMessage(LibraryRepository.savedMessage(result));
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {

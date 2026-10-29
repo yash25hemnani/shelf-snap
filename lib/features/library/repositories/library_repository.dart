@@ -10,6 +10,7 @@ class LibraryRepository {
     final data = library.toMap();
     // Ensure owner in members
     data["members"] = {...library.members, library.ownerId}.toList();
+    data["editors"] = {library.ownerId}.toList();
     final doc = await _db.collection("libraries").add(data);
     return doc.id;
   }
@@ -64,61 +65,67 @@ class LibraryRepository {
     return existingBook.docs.isEmpty ? null : existingBook.docs.first.reference;
   }
 
-  // Add a book to the libray, or one more copy if the edition is already there
-  Future<void> addBook(String libraryId, BookModel book) async {
-    final libraryRef = _db.collection('libraries').doc(libraryId);
-    final existingRef = await findBookInLibrary(libraryId, book);
-
-    final batch = _db.batch();
-
-    if (existingRef != null) {
-      // Another copy of the same edition, uniqueCount stays the same
-      batch.update(existingRef, {'noOfCopies': FieldValue.increment(1)});
-      batch.update(libraryRef, {'bookCount': FieldValue.increment(1)});
-    } else {
-      final bookRef = libraryRef
-          .collection('books')
-          .doc(); // new id, nothing written yet
-
-      batch.set(bookRef, book.toMap());
-      batch.update(libraryRef, {
-        'bookCount': FieldValue.increment(1),
-        'uniqueCount': FieldValue.increment(1),
-      });
-    }
-
-    await batch.commit();
-  }
-
-  // Add multiple books to a library
-  Future<void> addBooks(String libraryId, List<BookModel> books) async {
+  // Adds books to a library. A book already there, or repeated in this list,
+  // becomes one more copy. Returns how many were new and how many were copies.
+  Future<({int added, int copies})> addBooks(
+    String libraryId,
+    List<BookModel> books,
+  ) async {
     final libraryRef = _db.collection('libraries').doc(libraryId);
     final batch = _db.batch();
     final now = DateTime.now();
 
-    var unique = 0;
+    // Books created earlier in this call, by ISBN, since the database
+    // doesn't have them yet
+    final created = <String, DocumentReference<Map<String, dynamic>>>{};
+    var added = 0;
+    var copies = 0;
 
     for (final book in books) {
-      // Check if book in library
-      final existingRef = await findBookInLibrary(libraryId, book);
+      final isbn = book.isbn;
+      final existingRef =
+          (isbn == null ? null : created[isbn]) ??
+          await findBookInLibrary(libraryId, book);
 
       if (existingRef != null) {
         batch.update(existingRef, {'noOfCopies': FieldValue.increment(1)});
+        copies++;
         continue;
       }
 
-      final bookRef = libraryRef.collection("books").doc();
+      final bookRef = libraryRef.collection('books').doc();
       batch.set(bookRef, book.copyWith(addedAt: now).toMap());
-      unique++;
+      if (isbn != null) created[isbn] = bookRef;
+      added++;
     }
 
-    // Every book is one more physical copy, only new docs are new editions
+    // Every book is one more physical copy; only new docs are new editions
     batch.update(libraryRef, {
       'bookCount': FieldValue.increment(books.length),
-      'uniqueCount': FieldValue.increment(unique),
+      'uniqueCount': FieldValue.increment(added),
+      'updatedAt': Timestamp.now(),
     });
 
     await batch.commit();
+    return (added: added, copies: copies);
+  }
+
+  // What to tell the user after a save, e.g. "Saved 3 books, 1 as an
+  // extra copy" or "Already in this library, added another copy"
+  static String savedMessage(({int added, int copies}) result) {
+    final (:added, :copies) = result;
+    String books(int n) => n == 1 ? '1 book' : '$n books';
+
+    if (copies == 0) return 'Saved ${books(added)}';
+    if (added == 0) {
+      return copies == 1
+          ? 'Already in this library, added another copy'
+          : 'Already in this library, added ${books(copies)} as extra copies';
+    }
+    final extra = copies == 1
+        ? '1 as an extra copy'
+        : '$copies as extra copies';
+    return 'Saved ${books(added + copies)}, $extra';
   }
 
   // Watch books in a library. Each book remembers this library, so it can
@@ -221,7 +228,49 @@ class LibraryRepository {
   Future<void> removeMember(String libraryId, String uid) {
     return _db.collection('libraries').doc(libraryId).update({
       'members': FieldValue.arrayRemove([uid]),
+      'editors': FieldValue.arrayRemove([uid]),
       'updatedAt': Timestamp.now(),
+    });
+  }
+
+  //
+  Future<void> setEditor(String libraryId, String uid, bool isEditor) {
+    return _db.collection('libraries').doc(libraryId).update({
+      'editors': isEditor
+          ? FieldValue.arrayUnion([uid])
+          : FieldValue.arrayRemove([uid]),
+
+      'updatedAt': Timestamp.now(),
+    });
+  }
+
+  // Saves how the copy was acquired; empty text clears it
+  Future<void> updateAcquisition(
+    String libraryId,
+    String bookId,
+    String? text,
+  ) async {
+    final cleaned = text?.trim();
+
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+    final bookRef = libraryRef.collection('books').doc(bookId);
+
+    await bookRef.update({
+      'acquisition': cleaned == null || cleaned.isEmpty ? null : cleaned,
+    });
+  }
+
+  // One book, live; null once it's deleted
+  Stream<BookModel?> watchBook(String libraryId, String bookId) {
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+
+    return libraryRef.collection('books').doc(bookId).snapshots().map((snap) {
+      if (!snap.exists) return null;
+
+      return BookModel.fromMap(
+        snap.id,
+        snap.data()!,
+      ).copyWith(libraryId: libraryId);
     });
   }
 }
