@@ -40,6 +40,7 @@ class BarcodeSessionNotifier
 }
 
 final barcodeSessionProvider =
-    NotifierProvider.autoDispose<BarcodeSessionNotifier, Map<String, BarcodeHit>>(
-  BarcodeSessionNotifier.new,
-);
+    NotifierProvider.autoDispose<
+      BarcodeSessionNotifier,
+      Map<String, BarcodeHit>
+    >(BarcodeSessionNotifier.new);

@@ -18,9 +18,8 @@ class AimBox extends StatelessWidget {
       child: TweenAnimationBuilder<Color?>(
         tween: ColorTween(end: borderColor),
         duration: const Duration(milliseconds: 150),
-        builder: (context, color, _) => CustomPaint(
-          painter: _AimBoxPainter(window, color ?? borderColor),
-        ),
+        builder: (context, color, _) =>
+            CustomPaint(painter: _AimBoxPainter(window, color ?? borderColor)),
       ),
     );
   }

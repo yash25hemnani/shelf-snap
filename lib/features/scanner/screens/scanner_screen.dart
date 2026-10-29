@@ -255,53 +255,96 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       const SizedBox(width: 48),
                     ],
                   ),
-                  // Status card from just below the aim box down to the toggle
-                  if (isShelf)
-                    const Spacer()
+                  // Discover isn't built yet: a note instead of the controls
+                  if (_mode == ScanMode.discover)
+                    const Expanded(child: Center(child: _UnderConstruction()))
                   else ...[
-                    SizedBox(height: _cardGap(context)),
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: BarcodeStatusCard(highlightIsbn: _duplicateIsbn),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (_mode == ScanMode.add)
-                    ScanInputToggle(input: _input, onChanged: _setInput),
-
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Spacer(),
-                      if (isShelf)
-                        ShutterButton(
-                          pending: session.pending,
-                          maxPending: ScanSessionNotifier.maxPending,
-                          onPressed: _captureShelf,
-                        )
-                      else
-                        const SizedBox(
-                          width: 88,
-                        ), // same width as the shutter, keeps the badge in place
+                    // Status card from just below the aim box down to the toggle
+                    if (isShelf)
+                      const Spacer()
+                    else ...[
+                      SizedBox(height: _cardGap(context)),
                       Expanded(
-                        child: Center(
-                          child: ScanCountBadge(
-                            count: count,
-                            onTap: count == 0 ? null : _showResults,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: BarcodeStatusCard(
+                            highlightIsbn: _duplicateIsbn,
                           ),
                         ),
                       ),
+                      const SizedBox(height: 16),
                     ],
-                  ),
+                    if (_mode == ScanMode.add)
+                      ScanInputToggle(input: _input, onChanged: _setInput),
 
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Spacer(),
+                        if (isShelf)
+                          ShutterButton(
+                            pending: session.pending,
+                            maxPending: ScanSessionNotifier.maxPending,
+                            onPressed: _captureShelf,
+                          )
+                        else
+                          const SizedBox(
+                            width: 88,
+                          ), // same width as the shutter, keeps the badge in place
+                        Expanded(
+                          child: Center(
+                            child: ScanCountBadge(
+                              count: count,
+                              onTap: count == 0 ? null : _showResults,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 24),
+                  ],
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// Shown in Discover mode until the feature exists
+class _UnderConstruction extends StatelessWidget {
+  const _UnderConstruction();
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.6),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.construction_rounded, size: 40, color: Colors.white),
+          const SizedBox(height: 12),
+          Text(
+            'Under construction',
+            style: textTheme.titleMedium?.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Point at a shelf to find books you might like. Coming soon.',
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
+          ),
+        ],
       ),
     );
   }

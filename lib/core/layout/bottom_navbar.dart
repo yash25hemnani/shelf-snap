@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
-import 'package:shelf_snap/features/home/models/nav_item_model.dart';
+import 'package:shelf_snap/core/layout/nav_item_model.dart';
 
 class BottomNavbar extends StatelessWidget {
   final int selectedIndex;
@@ -56,10 +56,7 @@ class BottomNavbar extends StatelessWidget {
 
 // Big floating center button
 class _CenterNavItem extends StatelessWidget {
-  const _CenterNavItem({
-    required this.icon,
-    required this.onTap,
-  });
+  const _CenterNavItem({required this.icon, required this.onTap});
 
   final IconData icon;
   final VoidCallback onTap;
@@ -76,7 +73,9 @@ class _CenterNavItem extends StatelessWidget {
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.35),
+              color: Theme.of(
+                context,
+              ).colorScheme.primary.withValues(alpha: 0.35),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -126,18 +125,9 @@ class _NavItem extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              selected ? activeIcon : icon,
-              color: color,
-            ),
+            Icon(selected ? activeIcon : icon, color: color),
             const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                color: color,
-              ),
-            ),
+            Text(label, style: TextStyle(fontSize: 11, color: color)),
           ],
         ),
       ),
