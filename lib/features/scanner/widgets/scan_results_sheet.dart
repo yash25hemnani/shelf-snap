@@ -1,28 +1,69 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
-import 'package:shelf_snap/features/library/dialogs/save_to_library_dialog.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
+import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/library/models/library_model.dart';
+import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/repositories/library_repository.dart';
+import 'package:shelf_snap/features/library/widgets/library_picker_bar.dart';
 import 'package:shelf_snap/features/scanner/providers/scan_session_provider.dart';
 
-class ScanResultsSheet extends ConsumerWidget {
+// Books found in shelf photos, with a library picker and Save at the top,
+// the same as the barcode sheet
+class ScanResultsSheet extends ConsumerStatefulWidget {
   const ScanResultsSheet({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final results = ref.watch(scanSessionProvider).results;
+  ConsumerState<ScanResultsSheet> createState() => _ScanResultsSheetState();
+}
 
-    Future<void> openSave() async {
-      final saved = await showDialog(
-        context: context,
-        builder: (_) =>
-            SaveToLibraryDialog(books: [for (final res in results) res.book]),
+class _ScanResultsSheetState extends ConsumerState<ScanResultsSheet> {
+  String? _libraryId;
+  bool _isSaving = false;
+
+  void _selectLibrary(String id) {
+    ref.read(lastLibraryIdProvider.notifier).state = id;
+    setState(() => _libraryId = id);
+  }
+
+  // The user's pick, else the last-used library, else the first one.
+  // Each is checked against the list, since a library can be deleted or left.
+  String _pickLibrary(List<LibraryModel> libraries) {
+    final ids = libraries.map((l) => l.id).toSet();
+    final picked = _libraryId;
+    final last = ref.read(lastLibraryIdProvider);
+
+    if (picked != null && ids.contains(picked)) return picked;
+    if (last != null && ids.contains(last)) return last;
+    return libraries.first.id!; // libraries from Firestore always have an id
+  }
+
+  Future<void> _save(String libraryId) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final results = ref.read(scanSessionProvider).results;
+    setState(() => _isSaving = true);
+
+    try {
+      final result = await ref.read(libraryRepositoryProvider).addBooks(
+        libraryId,
+        [for (final r in results) r.book],
       );
 
-      if (saved != true || !context.mounted) return;
-
-      // The dialog already showed what was saved
       ref.read(scanSessionProvider.notifier).removeAll(results);
+      messenger.showMessage(LibraryRepository.savedMessage(result));
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      messenger.showError('Could not save: $e');
+      if (mounted) setState(() => _isSaving = false);
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = AuthService().currentUser!.uid;
+    final librariesAsync = ref.watch(userLibrariesProvider(userId));
+    final results = ref.watch(scanSessionProvider).results;
 
     return SafeArea(
       child: Column(
@@ -30,18 +71,36 @@ class ScanResultsSheet extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: Text(
-                    '${results.length} books found',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                Text(
+                  '${results.length} books found',
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                FilledButton.tonal(
-                  onPressed: results.isEmpty ? null : openSave,
-                  child: const Text('Save'),
+                const SizedBox(height: 12),
+                librariesAsync.when(
+                  data: (libraries) {
+                    if (libraries.isEmpty) {
+                      return const Text(
+                        'Create a library first to save books.',
+                      );
+                    }
+                    final libraryId = _pickLibrary(libraries);
+                    return LibraryPickerBar(
+                      libraries: libraries,
+                      selectedId: libraryId,
+                      onChanged: _selectLibrary,
+                      isSaving: _isSaving,
+                      onSave: results.isEmpty ? null : () => _save(libraryId),
+                    );
+                  },
+                  error: (e, _) => Text('Could not load libraries: $e'),
+                  loading: () => const SizedBox(
+                    height: 56,
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
                 ),
               ],
             ),
