@@ -27,70 +27,84 @@ class ReadingLogTile extends StatelessWidget {
       child: Center(child: Icon(Icons.book, color: AppColors.hint)),
     );
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              width: 48,
-              height: 72,
-              child: coverUrl == null
-                  ? placeholder
-                  : Image.network(
-                      coverUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) => placeholder,
+    // Material + InkWell so the tap ripple stays inside the rounded border
+    return Material(
+      color: AppColors.background,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: SizedBox(
+                  width: 48,
+                  height: 72,
+                  child: coverUrl == null
+                      ? placeholder
+                      : Image.network(
+                          coverUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => placeholder,
+                        ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      log.title,
+                      style: textTheme.titleSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  log.title,
-                  style: textTheme.titleSmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  log.authors.isEmpty
-                      ? 'Unknown author'
-                      : log.authors.join(', '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodySmall?.copyWith(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  log.status.label,
-                  style: textTheme.labelMedium?.copyWith(color: statusColor),
-                ),
-                // Want to read has no read, so no bar
-                if (read != null) ...[
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: LinearProgressIndicator(
-                      // Null when pages are used but the page count is unknown
-                      value: read.fraction(log.pageCount) ?? 0,
-                      minHeight: 4,
-                      color: statusColor,
-                      backgroundColor: AppColors.surfaceMuted,
+                    Text(
+                      log.authors.isEmpty
+                          ? 'Unknown author'
+                          : log.authors.join(', '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 6),
+                    Text(
+                      log.status.label,
+                      style: textTheme.labelMedium?.copyWith(
+                        color: statusColor,
+                      ),
+                    ),
+                    // Want to read has no read, so no bar
+                    if (read != null) ...[
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(999),
+                        child: LinearProgressIndicator(
+                          // Null when pages are used but the page count is unknown
+                          value: read.fraction(log.pageCount) ?? 0,
+                          minHeight: 4,
+                          color: statusColor,
+                          backgroundColor: AppColors.surfaceMuted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.hint),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

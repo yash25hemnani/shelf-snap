@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
 import 'package:shelf_snap/features/reading/screens/reading_log_detail_screen.dart';
@@ -14,8 +15,14 @@ class ReadingLogsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
     final filter = ref.watch(readingFilterProvider);
-    // Filtered by Firestore, so only the chosen status is downloaded
-    final logsAsync = ref.watch(readingLogsProvider(filter));
+    // Words under 2 letters are skipped, so one letter still shows the full list
+    final searching = BookModel.sanitizeWords(
+      ref.watch(readingSearchQueryProvider),
+    ).isNotEmpty;
+    // Both are filtered by Firestore, so only matching books are downloaded
+    final logsAsync = searching
+        ? ref.watch(readingSearchProvider(filter))
+        : ref.watch(readingLogsProvider(filter));
 
     return Scaffold(
       appBar: AppBar(
@@ -25,6 +32,18 @@ class ReadingLogsScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            child: TextField(
+              onChanged: (text) =>
+                  ref.read(readingSearchQueryProvider.notifier).state = text,
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(
+                hintText: 'Search title or author',
+                prefixIcon: Icon(Icons.search_rounded),
+              ),
+            ),
+          ),
           // Filter chips, scrolling sideways; null is "All"
           SizedBox(
             height: 48,
@@ -52,7 +71,9 @@ class ReadingLogsScreen extends ConsumerWidget {
                 if (logs.isEmpty) {
                   return Center(
                     child: Text(
-                      filter == null
+                      searching
+                          ? 'No books match your search'
+                          : filter == null
                           ? 'No books in your reading list yet'
                           : 'No books here',
                       style: textTheme.bodyMedium?.copyWith(
@@ -63,7 +84,7 @@ class ReadingLogsScreen extends ConsumerWidget {
                 }
 
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   itemCount: logs.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (_, i) => ReadingLogTile(
