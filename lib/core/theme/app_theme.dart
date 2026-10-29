@@ -113,6 +113,17 @@ class AppTheme {
         titleTextStyle: textTheme.titleLarge,
       ),
 
+      // The ⋮ menus: plain white with a light border
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.background,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+      ),
+
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.text,
         contentTextStyle: textTheme.bodyMedium?.copyWith(
