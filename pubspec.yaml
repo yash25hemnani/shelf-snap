@@ -71,6 +71,19 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# App icon. Regenerate after changing the images:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: assets/icon/icon.png
+  android: ic_launcher
+  # Newer Android crops icons to a circle or squircle, so the logo is
+  # shrunk in this layer to stay inside the visible area
+  adaptive_icon_background: "#2F6B4F"
+  adaptive_icon_foreground: assets/icon/icon_foreground.png
+  ios: true
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

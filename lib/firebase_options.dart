@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAWYhm_Ysp6MQ6tkp0EU1L5bWy2NCwx7cQ',
-    appId: '1:726504803682:android:f72775ce867ffc67ba303b',
+    appId: '1:726504803682:android:7d2b751d025c04fdba303b',
     messagingSenderId: '726504803682',
     projectId: 'shelf-scan-28d17',
     storageBucket: 'shelf-scan-28d17.firebasestorage.app',
