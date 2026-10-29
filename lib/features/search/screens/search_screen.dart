@@ -23,14 +23,11 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     super.dispose();
   }
 
-  Future<void> _addBook(BookModel book) async {
+  // The sheet shows its own message, including "already in this library".
+  // True once the book is saved.
+  Future<bool> _addBook(BookModel book) async {
     final saved = await SaveToLibrarySheet.show(context, book: book);
-
-    if (saved != true || !mounted) return;
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('Added "${book.title}"')));
+    return saved == true;
   }
 
   @override
