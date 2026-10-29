@@ -3,6 +3,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
+import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/invites/sheets/invite_sheet.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
@@ -93,31 +94,17 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     }
 
     final isDelete = action == _LibraryAction.delete;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(
-          isDelete ? 'Delete ${library.name}?' : 'Leave ${library.name}?',
-        ),
-        content: Text(
-          isDelete
-              ? 'All its books are deleted for every member. This cannot be undone.'
-              : "You'll lose access to this library's books until you're invited again.",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: Text(isDelete ? 'Delete' : 'Leave'),
-          ),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: isDelete ? Icons.delete_outline_rounded : Icons.logout_rounded,
+      title: isDelete ? 'Delete ${library.name}?' : 'Leave ${library.name}?',
+      message: isDelete
+          ? 'All its books are deleted for every member. This cannot be undone.'
+          : "You'll lose access to this library's books until you're invited again.",
+      confirmLabel: isDelete ? 'Delete' : 'Leave',
+      destructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     // Back to the list first, since this page loses access once it's done
     final messenger = ScaffoldMessenger.of(context);
