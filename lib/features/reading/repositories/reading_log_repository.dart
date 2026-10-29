@@ -44,6 +44,27 @@ class ReadingLogRepository {
         );
   }
 
+  // Every read of every book, for stats. Each read comes with its book's
+  // readingKey, since ReadModel doesn't store it.
+  Stream<List<({String readingKey, ReadModel read})>> watchAllReads(
+    String userId,
+  ) {
+    return _db
+        .collectionGroup('reads')
+        .where('uid', isEqualTo: userId)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map(
+                (doc) => (
+                  readingKey: doc.reference.parent.parent!.id,
+                  read: ReadModel.fromMap(doc.id, doc.data()),
+                ),
+              )
+              .toList(),
+        );
+  }
+
   Stream<List<ReadingLogModel>> searchLogs(
     String userId,
     String token, {
@@ -155,6 +176,7 @@ class ReadingLogRepository {
         final newRead = ReadModel(
           id: readRef.id,
           userId: userId,
+          pageCount: log.pageCount,
         ).withStatus(nextStatus);
 
         // Update reads
@@ -182,8 +204,10 @@ class ReadingLogRepository {
         }
 
         // When model is not null
-        final updatedModel = readModel.withStatus(nextStatus);
-        if (identical(updatedModel, readModel)) return false; // blocked
+        final changed = readModel.withStatus(nextStatus);
+        if (identical(changed, readModel)) return false; // blocked
+        // Takes the log's page count, so a finish keeps the count it ended at
+        final updatedModel = changed.copyWith(pageCount: log.pageCount);
 
         // Save the changed read over the old one, and its copy on the log
         tx.update(readDoc!.reference, updatedModel.toMap());
@@ -196,7 +220,8 @@ class ReadingLogRepository {
     });
   }
 
-  // Sets the book's page count on the log, for books Google Books had none for
+  // Sets the book's page count on the log, for books Google Books had none for.
+  // An active read gets it too; ended reads keep the count they had.
   Future<void> updatePageCount(
     int pageCount,
     String readingKey,
@@ -205,6 +230,7 @@ class ReadingLogRepository {
     if (pageCount <= 0) throw ArgumentError('Invalid page count: $pageCount');
 
     final logRef = _logs(userId).doc(readingKey);
+    final reads = _reads(userId, readingKey);
 
     await _db.runTransaction((tx) async {
       final logDoc = await tx.get(logRef);
@@ -213,7 +239,24 @@ class ReadingLogRepository {
       final log = ReadingLogModel.fromMap(logDoc.id, logDoc.data()!);
       if (log.pageCount == pageCount) return; // no change
 
-      tx.update(logRef, log.copyWith(pageCount: pageCount).toMap());
+      // Reads must all happen before the first write in a transaction
+      final latestReadId = log.latestRead?.id;
+      final readDoc = latestReadId == null || !log.hasActiveRead
+          ? null
+          : await tx.get(reads.doc(latestReadId));
+
+      var updatedLog = log.copyWith(pageCount: pageCount);
+
+      if (readDoc != null && readDoc.exists) {
+        final read = ReadModel.fromMap(
+          readDoc.id,
+          readDoc.data()!,
+        ).copyWith(pageCount: pageCount);
+        tx.update(readDoc.reference, read.toMap());
+        updatedLog = updatedLog.copyWith(latestRead: read);
+      }
+
+      tx.update(logRef, updatedLog.toMap());
     });
   }
 
@@ -245,8 +288,10 @@ class ReadingLogRepository {
       // Get the read model
       final readModel = ReadModel.fromMap(readDoc.id, readDoc.data()!);
 
-      final updatedModel = readModel.withProgress(value, unit, log.pageCount);
-      if (identical(updatedModel, readModel)) return; // ended read or no change
+      final changed = readModel.withProgress(value, unit, log.pageCount);
+      if (identical(changed, readModel)) return; // ended read or no change
+      // Also fills it in on reads saved before reads had a page count
+      final updatedModel = changed.copyWith(pageCount: log.pageCount);
 
       tx.update(readDoc.reference, updatedModel.toMap());
 
@@ -307,7 +352,11 @@ class ReadingLogRepository {
       if (latest == null || latest.isActive) return;
 
       final readRef = reads.doc(); // new id
-      final newRead = ReadModel(id: readRef.id, userId: userId);
+      final newRead = ReadModel(
+        id: readRef.id,
+        userId: userId,
+        pageCount: log.pageCount,
+      );
 
       tx.set(readRef, newRead.toMap());
       tx.update(
@@ -341,15 +390,16 @@ class ReadingLogRepository {
       if (!logDoc.exists) return;
 
       final log = ReadingLogModel.fromMap(logDoc.id, logDoc.data()!);
+      final saved = read.copyWith(pageCount: log.pageCount);
 
-      tx.set(readRef, read.toMap());
+      tx.set(readRef, saved.toMap());
 
       // A want to read book has no read yet, so this one becomes the latest.
       // Otherwise the current read stays the main one.
       if (log.latestRead == null) {
         tx.update(
           logRef,
-          log.copyWith(status: read.status, latestRead: read).toMap(),
+          log.copyWith(status: saved.status, latestRead: saved).toMap(),
         );
       }
     });

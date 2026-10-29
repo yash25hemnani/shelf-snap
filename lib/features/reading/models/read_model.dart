@@ -13,6 +13,10 @@ class ReadModel {
   final ReadDate? endedAt; // null while reading or paused
   final int progressValue;
   final ProgressUnit progressUnit;
+  // The book's page count for this read. Follows the log while the read
+  // is active, then stays as it was, so editing the log later doesn't
+  // change past stats. Null on reads saved before this field existed.
+  final int? pageCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -24,6 +28,7 @@ class ReadModel {
     this.endedAt,
     this.progressValue = 0,
     this.progressUnit = ProgressUnit.pages,
+    this.pageCount,
     this.createdAt,
     this.updatedAt,
   });
@@ -38,6 +43,7 @@ class ReadModel {
     progressUnit:
         ProgressUnit.values.asNameMap()[map['progressUnit']] ??
         ProgressUnit.pages,
+    pageCount: (map['pageCount'] as num?)?.toInt(),
     createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
     updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
   );
@@ -51,6 +57,7 @@ class ReadModel {
     'endedAtPrecision': endedAt?.precision.name,
     'progressValue': progressValue,
     'progressUnit': progressUnit.name,
+    'pageCount': pageCount,
     'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
     'updatedAt': Timestamp.now(),
   };
@@ -83,6 +90,7 @@ class ReadModel {
     bool clearEndedAt = false,
     int? progressValue,
     ProgressUnit? progressUnit,
+    int? pageCount,
   }) {
     return ReadModel(
       id: id,
@@ -92,6 +100,7 @@ class ReadModel {
       endedAt: clearEndedAt ? null : (endedAt ?? this.endedAt),
       progressValue: progressValue ?? this.progressValue,
       progressUnit: progressUnit ?? this.progressUnit,
+      pageCount: pageCount ?? this.pageCount,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

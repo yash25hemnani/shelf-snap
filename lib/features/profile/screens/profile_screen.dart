@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
+import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/profile/providers/user_provider.dart';
 import 'package:shelf_snap/features/profile/screens/edit_profile_screen.dart';
 import 'package:shelf_snap/features/reading/screens/reading_logs_screen.dart';
+import 'package:shelf_snap/features/reading/screens/reading_stats_screen.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -115,10 +117,9 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // Opens the reading list until the stats screen exists
           _MenuRow(
-            icon: Icons.insights_rounded,
-            label: 'Reading Stats',
+            icon: Icons.auto_stories_outlined,
+            label: 'Reading logs',
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const ReadingLogsScreen()),
@@ -126,8 +127,18 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           _MenuRow(
-            icon: Icons.people_alt_outlined,
+            icon: Icons.insights_outlined,
+            label: 'Reading stats',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReadingStatsScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _MenuRow(
+            icon: Icons.people_outline_rounded,
             label: 'Friends',
+            comingSoon: true,
             onTap: () => _comingSoon(context),
           ),
           const SizedBox(height: 8),
@@ -210,11 +221,13 @@ class _MenuRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool comingSoon;
 
   const _MenuRow({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.comingSoon = false,
   });
 
   @override
@@ -233,10 +246,9 @@ class _MenuRow extends StatelessWidget {
           child: Icon(icon, size: 20, color: AppColors.primaryDark),
         ),
         title: Text(label),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.hint,
-        ),
+        trailing: comingSoon
+            ? const SoftPill(label: 'Coming soon')
+            : const Icon(Icons.chevron_right_rounded, color: AppColors.hint),
       ),
     );
   }

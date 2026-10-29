@@ -3,6 +3,7 @@ import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/reading/models/read_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
+import 'package:shelf_snap/features/reading/models/reading_stats.dart';
 import 'package:shelf_snap/features/reading/repositories/reading_log_repository.dart';
 
 final readingLogRepositoryProvider = Provider((ref) => ReadingLogRepository());
@@ -74,3 +75,25 @@ final readingSearchProvider = StreamProvider.autoDispose
 final readingFilterProvider = StateProvider.autoDispose<BookStatus?>(
   (ref) => null,
 );
+
+// Every read of every book, for stats
+final allReadsProvider =
+    StreamProvider.autoDispose<List<({String readingKey, ReadModel read})>>((
+      ref,
+    ) {
+      final userId = ref.watch(currentUidProvider).valueOrNull;
+      if (userId == null) return Stream.value(const []);
+
+      return ref.watch(readingLogRepositoryProvider).watchAllReads(userId);
+    });
+
+// Stats for one year, or all time when null
+final readingStatsProvider = Provider.autoDispose
+    .family<AsyncValue<ReadingStats>, int?>((ref, year) {
+      final reads = ref.watch(allReadsProvider);
+      final logs = ref.watch(readingLogsProvider(null));
+
+      return reads.whenData(
+        (r) => ReadingStats.from(r, logs.valueOrNull ?? const [], year: year),
+      );
+    });
