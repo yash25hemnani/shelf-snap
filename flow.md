@@ -99,6 +99,14 @@ Rules:
 4. **Notifications** (Step 10.5)
 5. Everything else in step order. Polish items wait for the test run.
 
+### Next up: book and read fields (added 2026-10-29, least work first)
+- [ ] N.1 **Acquisition source:** a fixed choice (Bought, Gift, Borrowed, Other) on the library book, with a dropdown on the book page
+- [ ] N.2 **Original language:** a field on the book, picked from a list. Google Books only gives the edition's language (same as 2.5)
+- [ ] N.3 **Rating /10 + review:** saved on each read, so every re-read gets its own rating. A slider and a text box on the reading log page
+- [ ] N.4 **Owner + lent to:** owner is who added the copy (`addedBy`); lending saves who it's lent to, when, and a Return action. Keep the library's Lent count right inside a transaction
+
+Later phase: unique rank and rank by cover / title (Step 8), heat map (6.3), AI genres (2.4).
+
 ### Step 1: Add to library from Search
 - [ ] 1.1 Make `LibraryPickerSheet` take `List<BookModel>` instead of `List<ScoredBookResult>`
 - [ ] 1.2 Update the scanner's call site to pass `_results.map((r) => r.book).toList()`
