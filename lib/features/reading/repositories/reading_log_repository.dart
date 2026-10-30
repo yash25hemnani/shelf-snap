@@ -447,4 +447,30 @@ class ReadingLogRepository {
       tx.delete(_reads(userId, readingKey).doc(readId));
     });
   }
+
+  // The book's rating, 1–10; null removes it
+  Future<void> updateRating(
+    int? rating,
+    String readingKey,
+    String userId,
+  ) async {
+    if (rating != null && (rating < 1 || rating > 10)) {
+      throw ArgumentError('Invalid rating: $rating');
+    }
+
+    await _logs(userId).doc(readingKey).update({'rating': rating});
+  }
+
+  // The book's review; empty or blank removes it
+  Future<void> updateReview(
+    String review,
+    String readingKey,
+    String userId,
+  ) async {
+    final text = review.trim();
+
+    await _logs(
+      userId,
+    ).doc(readingKey).update({'review': text.isEmpty ? null : text});
+  }
 }

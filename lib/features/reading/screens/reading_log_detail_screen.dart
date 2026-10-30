@@ -12,6 +12,7 @@ import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
 import 'package:shelf_snap/features/reading/widgets/edit_dates_sheet.dart';
 import 'package:shelf_snap/features/reading/widgets/number_dialog.dart';
+import 'package:shelf_snap/features/reading/widgets/review_sheet.dart';
 
 // One book on the reading list: status, progress and dates of the latest read
 class ReadingLogDetailScreen extends ConsumerStatefulWidget {
@@ -235,6 +236,41 @@ class _ReadingLogDetailScreenState
     }
   }
 
+  // Null clears it; tapping the current rating again does that
+  Future<void> _saveRating(int? rating) async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .updateRating(rating, widget.readingKey, userId);
+    } catch (e) {
+      debugPrint('updateRating failed: $e');
+      messenger.showError("Couldn't save rating, check your connection");
+    }
+  }
+
+  // Clearing the text removes the review
+  Future<void> _editReview(ReadingLogModel log) async {
+    final userId = AuthService().currentUser?.uid;
+    if (userId == null) return;
+
+    final text = await showReviewSheet(context, current: log.review);
+    if (text == null || text == (log.review ?? '') || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(readingLogRepositoryProvider)
+          .updateReview(text, widget.readingKey, userId);
+    } catch (e) {
+      debugPrint('updateReview failed: $e');
+      messenger.showError("Couldn't save review, check your connection");
+    }
+  }
+
   Future<void> _confirmDelete() async {
     final userId = AuthService().currentUser?.uid;
     if (userId == null) return;
@@ -342,6 +378,14 @@ class _ReadingLogDetailScreenState
           final history = (reads ?? const <ReadModel>[])
               .where((r) => r.id != read?.id)
               .toList();
+          // Rating opens once the book has been finished or dropped at
+          // least once, and stays open after that
+          final canRate =
+              log.rating != null ||
+              log.review != null ||
+              (read != null && !read.isActive) ||
+              history.isNotEmpty;
+          final review = log.review;
           final coverUrl = log.coverUrl;
           const placeholder = ColoredBox(
             color: AppColors.surfaceMuted,
@@ -594,6 +638,44 @@ class _ReadingLogDetailScreenState
                         ],
                       ],
 
+                      if (canRate) ...[
+                        const SizedBox(height: 16),
+                        SectionCard(
+                          icon: Icons.star_outline_rounded,
+                          title: 'Rating',
+                          trailing: Padding(
+                            padding: const EdgeInsets.only(right: 4),
+                            child: SoftPill(
+                              label: log.rating == null
+                                  ? '–/10'
+                                  : '${log.rating}/10',
+                            ),
+                          ),
+                          child: _RatingRow(
+                            rating: log.rating,
+                            onChanged: _saveRating,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SectionCard(
+                          icon: Icons.rate_review_outlined,
+                          title: 'Review',
+                          trailing: TextButton.icon(
+                            onPressed: () => _editReview(log),
+                            icon: Icon(
+                              review == null
+                                  ? Icons.add_rounded
+                                  : Icons.edit_outlined,
+                              size: 18,
+                            ),
+                            label: Text(review == null ? 'Add' : 'Edit'),
+                          ),
+                          child: review == null
+                              ? Text('No review yet', style: muted)
+                              : Text(review, style: textTheme.bodyMedium),
+                        ),
+                      ],
+
                       if (hasPages) ...[
                         const SizedBox(height: 16),
                         SectionCard(
@@ -640,6 +722,56 @@ class _ReadingLogDetailScreenState
         error: (e, _) => Center(child: Text('Could not load this book: $e')),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
+    );
+  }
+}
+
+// Ten circles, 1 to 10. Circles up to the rating are filled.
+// Tapping the current rating again clears it.
+class _RatingRow extends StatelessWidget {
+  final int? rating;
+  final ValueChanged<int?> onChanged;
+
+  const _RatingRow({required this.rating, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final style = Theme.of(context).textTheme.labelLarge;
+    final rating = this.rating ?? 0;
+
+    return Row(
+      children: [
+        for (var n = 1; n <= 10; n++)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Material(
+                  color: n <= rating
+                      ? AppColors.primary
+                      : AppColors.surfaceMuted,
+                  shape: const CircleBorder(),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => onChanged(n == rating ? null : n),
+                    child: Center(
+                      child: Text(
+                        '$n',
+                        style: style?.copyWith(
+                          color: n <= rating
+                              ? AppColors.onPrimary
+                              : AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
