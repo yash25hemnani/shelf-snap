@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/widgets/language_sheet.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/languages.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/core/widgets/text_dialog.dart';
@@ -129,6 +131,36 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     }
   }
 
+  Future<void> _editOriginalLanguage(String? current) async {
+    final libraryId = widget.book.libraryId;
+    final bookId = widget.book.id;
+
+    if (libraryId == null || bookId == null) return;
+
+    final code = await showLanguageSheet(
+      context,
+      title: "Original language",
+      current: current,
+    );
+
+    if (code == null || !mounted) return; // dismissed
+
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await ref
+          .read(libraryRepositoryProvider)
+          .updateOriginalLanguage(
+            libraryId,
+            bookId,
+            code.isEmpty ? null : code,
+          );
+    } catch (e) {
+      debugPrint('updateOriginalLanguage failed: $e');
+      messenger.showError("Couldn't save, check your connection");
+    }
+  }
+
   void _openLog(String readingKey) {
     Navigator.push(
       context,
@@ -174,10 +206,17 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     // Google Books sends 0 when it doesn't know
     final pageCount = (book.pageCount ?? 0) > 0 ? book.pageCount : null;
     final description = book.description;
+    // The original language only adds something when this edition differs
+    final original = book.originalLanguage;
+    final translatedFrom =
+        original != null && original != book.language?.toLowerCase()
+        ? original
+        : null;
     final hasDetails =
         book.publisher != null ||
         book.publishedDate != null ||
         book.language != null ||
+        translatedFrom != null ||
         book.isbn != null;
 
     final coverUrl = book.coverUrl;
@@ -313,10 +352,15 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                               label: 'Published',
                               value: book.publishedDate,
                             ),
-                          if (book.language != null)
+                          if (book.language case final language?)
                             _InfoRow(
                               label: 'Language',
-                              value: book.language!.toUpperCase(),
+                              value: languageName(language),
+                            ),
+                          if (translatedFrom != null)
+                            _InfoRow(
+                              label: 'Translated from',
+                              value: languageName(translatedFrom),
                             ),
                           if (book.isbn != null)
                             _InfoRow(label: 'ISBN', value: book.isbn),
@@ -348,11 +392,26 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                     SectionCard(
                       icon: Icons.inventory_2_outlined,
                       title: 'Your copy',
-                      child: _InfoRow(
-                        label: 'Acquired',
-                        value: book.acquisition,
-                        placeholder: 'Add',
-                        onTap: () => _editAcquisition(book.acquisition),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _InfoRow(
+                            label: 'Acquired',
+                            value: book.acquisition,
+                            placeholder: 'Add',
+                            onTap: () => _editAcquisition(book.acquisition),
+                          ),
+                          _InfoRow(
+                            label: 'Original language',
+                            value: switch (book.originalLanguage) {
+                              null => null,
+                              final code => languageName(code),
+                            },
+                            placeholder: 'Add',
+                            onTap: () =>
+                                _editOriginalLanguage(book.originalLanguage),
+                          ),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 12),

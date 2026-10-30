@@ -35,6 +35,7 @@ class BookModel {
 
   final BookSource? source;
   final String? acquisition; // "Bought at Crossword", null = not set
+  final String? originalLanguage; // Set by the user, null = not set
 
   /// Placeholder when the provider sends no title.
   static const unknownTitle = 'Unknown Title';
@@ -63,6 +64,7 @@ class BookModel {
     this.coverUrl,
     this.source,
     this.acquisition,
+    this.originalLanguage,
   });
 
   /// One book from /search-books, /isbn-search or /identify-books.
@@ -90,6 +92,7 @@ class BookModel {
         addedAt: (map['addedAt'] as Timestamp?)?.toDate(),
         noOfCopies: (map['noOfCopies'] as num?)?.toInt(),
         acquisition: map['acquisition'] as String?,
+        originalLanguage: map['originalLanguage'] as String?,
       );
 
   Map<String, dynamic> toMap() => {
@@ -110,6 +113,7 @@ class BookModel {
     'coverUrl': coverUrl,
     'source': source?.name,
     'acquisition': acquisition,
+    'originalLanguage': originalLanguage,
     'searchTokens': searchTokens,
   };
 
@@ -120,6 +124,7 @@ class BookModel {
     DateTime? addedAt,
     int? noOfCopies,
     String? acquisition,
+    String? originalLanguage,
   }) => BookModel(
     id: id ?? this.id,
     libraryId: libraryId ?? this.libraryId,
@@ -140,6 +145,7 @@ class BookModel {
     coverUrl: coverUrl,
     source: source,
     acquisition: acquisition ?? this.acquisition,
+    originalLanguage: originalLanguage ?? this.originalLanguage,
   );
 
   /// "A, B" for display; null when there are no authors.

@@ -260,6 +260,19 @@ class LibraryRepository {
     });
   }
 
+  Future<void> updateOriginalLanguage(
+    String libraryId,
+    String bookId,
+    String? code,
+  ) async {
+    final bookRef = _db.collection('libraries')
+                       .doc(libraryId)
+                       .collection('books')
+                       .doc(bookId);
+
+    await bookRef.update({'originalLanguage': code});
+  }
+
   // One book, live; null once it's deleted
   Stream<BookModel?> watchBook(String libraryId, String bookId) {
     final libraryRef = _db.collection('libraries').doc(libraryId);
