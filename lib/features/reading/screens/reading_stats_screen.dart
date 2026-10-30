@@ -6,8 +6,8 @@ import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/features/reading/models/reading_stats.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
 
-// Books finished, pages read and a month-by-month chart, for this year
-// or all time
+// Books finished, pages read and a month-by-month chart, for a chosen
+// year or all time
 class ReadingStatsScreen extends ConsumerStatefulWidget {
   const ReadingStatsScreen({super.key});
 
@@ -16,15 +16,17 @@ class ReadingStatsScreen extends ConsumerStatefulWidget {
 }
 
 class _ReadingStatsScreenState extends ConsumerState<ReadingStatsScreen> {
-  bool _thisYear = true;
+  final _now = DateTime.now();
+  late int _year = _now.year; // the year picked in the menu
+  bool _allTime = false;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final year = DateTime.now().year;
+    final years = ref.watch(readYearsProvider);
     // Zeros for a moment while the reads load
     final stats =
-        ref.watch(readingStatsProvider(_thisYear ? year : null)).valueOrNull ??
+        ref.watch(readingStatsProvider(_allTime ? null : _year)).valueOrNull ??
         const ReadingStats.empty();
 
     return Scaffold(
@@ -39,16 +41,39 @@ class _ReadingStatsScreenState extends ConsumerState<ReadingStatsScreen> {
         children: [
           Row(
             children: [
-              ChoiceChip(
-                label: Text('$year'),
-                selected: _thisYear,
-                onSelected: (_) => setState(() => _thisYear = true),
+              // Tapping the year chip opens a menu of years with reads
+              MenuAnchor(
+                menuChildren: [
+                  for (final y in years)
+                    MenuItemButton(
+                      onPressed: () => setState(() {
+                        _year = y;
+                        _allTime = false;
+                      }),
+                      trailingIcon: !_allTime && y == _year
+                          ? const Icon(Icons.check_rounded, size: 18)
+                          : null,
+                      child: Text('$y'),
+                    ),
+                ],
+                builder: (context, menu, _) => ChoiceChip(
+                  label: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('$_year'),
+                      const SizedBox(width: 2),
+                      const Icon(Icons.arrow_drop_down_rounded, size: 20),
+                    ],
+                  ),
+                  selected: !_allTime,
+                  onSelected: (_) => menu.isOpen ? menu.close() : menu.open(),
+                ),
               ),
               const SizedBox(width: 8),
               ChoiceChip(
                 label: const Text('All time'),
-                selected: !_thisYear,
-                onSelected: (_) => setState(() => _thisYear = false),
+                selected: _allTime,
+                onSelected: (_) => setState(() => _allTime = true),
               ),
             ],
           ),
@@ -88,14 +113,15 @@ class _ReadingStatsScreenState extends ConsumerState<ReadingStatsScreen> {
           ),
 
           // Months only make sense within one year
-          if (_thisYear) ...[
+          if (!_allTime) ...[
             const SizedBox(height: 16),
             SectionCard(
               icon: Icons.bar_chart_rounded,
               title: 'Finished per month',
               child: _MonthChart(
                 counts: stats.finishedPerMonth,
-                currentMonth: DateTime.now().month,
+                // Past years have no current month to mark
+                currentMonth: _year == _now.year ? _now.month : null,
               ),
             ),
           ],
@@ -160,7 +186,7 @@ class _StatTile extends StatelessWidget {
 // Empty months show a short grey stub so the row never looks broken.
 class _MonthChart extends StatelessWidget {
   final List<int> counts;
-  final int currentMonth; // 1–12, drawn darker
+  final int? currentMonth; // 1–12, drawn darker; null for past years
 
   const _MonthChart({required this.counts, required this.currentMonth});
 

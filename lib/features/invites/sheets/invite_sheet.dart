@@ -67,7 +67,12 @@ class _InviteSheetState extends ConsumerState<InviteSheet> {
 
     // Your own profile, already loaded by AuthGate
     final me = ref.read(userProfileProvider(uid)).valueOrNull;
+    final pending = ref
+        .read(pendingInviteesProvider(widget.library.id!))
+        .valueOrNull;
     if (me == null || _sendingUid != null) return;
+    // Guards a tap that lands before the list above has loaded
+    if (pending?.contains(to.uid) ?? false) return;
 
     setState(() => _sendingUid = to.uid);
     try {
@@ -92,6 +97,13 @@ class _InviteSheetState extends ConsumerState<InviteSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // Invites from earlier visits, plus ones sent just now (shown straight
+    // away, before Firestore reports them)
+    final invited = {
+      ...?ref.watch(pendingInviteesProvider(widget.library.id!)).valueOrNull,
+      ..._sent,
+    };
+
     // Fixed height so the results list can scroll inside the sheet
     return FractionallySizedBox(
       heightFactor: 0.85,
@@ -127,7 +139,7 @@ class _InviteSheetState extends ConsumerState<InviteSheet> {
                           contentPadding: EdgeInsets.zero,
                           title: Text(user.name),
                           subtitle: Text('@${user.username}'),
-                          trailing: _sent.contains(user.uid)
+                          trailing: invited.contains(user.uid)
                               ? const Text('Sent')
                               : FilledButton.tonal(
                                   // Disabled while any invite is sending

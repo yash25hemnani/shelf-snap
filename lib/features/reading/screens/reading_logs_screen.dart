@@ -19,10 +19,12 @@ class ReadingLogsScreen extends ConsumerWidget {
     final searching = BookModel.sanitizeWords(
       ref.watch(readingSearchQueryProvider),
     ).isNotEmpty;
-    // Both are filtered by Firestore, so only matching books are downloaded
+    // Both are filtered by Firestore, so only matching books are downloaded.
+    // Search results are capped at 50, so only the full list pages.
     final logsAsync = searching
         ? ref.watch(readingSearchProvider(filter))
-        : ref.watch(readingLogsProvider(filter));
+        : ref.watch(pagedReadingLogsProvider(filter));
+    final loadingMore = !searching && logsAsync.isLoading;
 
     return Scaffold(
       appBar: AppBar(
@@ -32,17 +34,6 @@ class ReadingLogsScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // Hidden while typing, so the keyboard leaves room for results
-          if (MediaQuery.viewInsetsOf(context).bottom == 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              // Full width; the height follows the image's shape
-              child: Image.asset(
-                'assets/images/reading.png',
-                width: double.infinity,
-                fit: BoxFit.fitWidth,
-              ),
-            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(
@@ -78,6 +69,8 @@ class ReadingLogsScreen extends ConsumerWidget {
           ),
           Expanded(
             child: logsAsync.when(
+              // Keeps the list and its scroll position while the next page loads
+              skipLoadingOnReload: true,
               data: (logs) {
                 if (logs.isEmpty) {
                   return Center(
@@ -94,19 +87,43 @@ class ReadingLogsScreen extends ConsumerWidget {
                   );
                 }
 
-                return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  itemCount: logs.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 12),
-                  itemBuilder: (_, i) => ReadingLogTile(
-                    log: logs[i],
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            ReadingLogDetailScreen(readingKey: logs[i].id!),
-                      ),
-                    ),
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (n) {
+                    if (searching) return false;
+
+                    final limit = ref.read(readingLogsLimitProvider(filter));
+                    // A full page means there may be more logs after it
+                    final hasMore = logs.length >= limit;
+                    if (n.metrics.extentAfter < 400 &&
+                        hasMore &&
+                        !logsAsync.isLoading) {
+                      ref
+                              .read(readingLogsLimitProvider(filter).notifier)
+                              .state +=
+                          readingLogsPageSize;
+                    }
+                    return false;
+                  },
+                  child: ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    itemCount: logs.length + (loadingMore ? 1 : 0),
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (_, i) {
+                      if (i == logs.length) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      return ReadingLogTile(
+                        log: logs[i],
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                ReadingLogDetailScreen(readingKey: logs[i].id!),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 );
               },

@@ -26,22 +26,27 @@ class ReadingLogRepository {
         );
   }
 
-  // The user's logs, most recently changed first; [status] null means all.
+  // The user's logs, most recently changed first; [status] null means all,
+  // [limit] null means every log.
   // Filtering by status needs a composite index: status + updatedAt.
-  Stream<List<ReadingLogModel>> watchLogs(String userId, {BookStatus? status}) {
+  Stream<List<ReadingLogModel>> watchLogs(
+    String userId, {
+    BookStatus? status,
+    int? limit,
+  }) {
     Query<Map<String, dynamic>> query = _logs(userId);
     if (status != null) {
       query = query.where('status', isEqualTo: status.name);
     }
 
-    return query
-        .orderBy('updatedAt', descending: true)
-        .snapshots()
-        .map(
-          (snap) => snap.docs
-              .map((doc) => ReadingLogModel.fromMap(doc.id, doc.data()))
-              .toList(),
-        );
+    query = query.orderBy('updatedAt', descending: true);
+    if (limit != null) query = query.limit(limit);
+
+    return query.snapshots().map(
+      (snap) => snap.docs
+          .map((doc) => ReadingLogModel.fromMap(doc.id, doc.data()))
+          .toList(),
+    );
   }
 
   // Every read of every book, for stats. Each read comes with its book's

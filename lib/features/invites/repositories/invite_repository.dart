@@ -40,6 +40,22 @@ class InviteRepository {
         );
   }
 
+  // People with an unanswered invite to this library from [fromUid]. The
+  // rules only let senders read their own invites, hence the fromUid filter.
+  Stream<Set<String>> watchPendingInvitees(String libraryId, String fromUid) {
+    return _db
+        .collection('invites')
+        .where('fromUid', isEqualTo: fromUid)
+        .where('libraryId', isEqualTo: libraryId)
+        .where('status', isEqualTo: InviteStatus.pending.name)
+        .snapshots()
+        .map(
+          (snap) => {
+            for (final doc in snap.docs) doc.data()['toUid'] as String,
+          },
+        );
+  }
+
   Future<void> accept(InviteModel invite) async {
     final batch = _db.batch();
     final libraryRef = _db.collection('libraries').doc(invite.libraryId);

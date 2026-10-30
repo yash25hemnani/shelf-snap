@@ -41,6 +41,27 @@ final readingLogsProvider = StreamProvider.autoDispose
           .watchLogs(userId, status: status);
     });
 
+// Logs loaded per page on My reading
+const readingLogsPageSize = 30;
+
+// How many logs My reading has asked for so far, per chip
+final readingLogsLimitProvider = StateProvider.autoDispose
+    .family<int, BookStatus?>((ref, status) => readingLogsPageSize);
+
+// Newest logs for one chip, up to the current limit, for My reading.
+// Stats and Home use readingLogsProvider, which loads every log.
+final pagedReadingLogsProvider = StreamProvider.autoDispose
+    .family<List<ReadingLogModel>, BookStatus?>((ref, status) {
+      final userId = ref.watch(currentUidProvider).valueOrNull;
+      if (userId == null) return Stream.value(const []);
+
+      final limit = ref.watch(readingLogsLimitProvider(status));
+
+      return ref
+          .watch(readingLogRepositoryProvider)
+          .watchLogs(userId, status: status, limit: limit);
+    });
+
 // Text typed in the My reading search bar
 final readingSearchQueryProvider = StateProvider.autoDispose<String>(
   (ref) => '',
@@ -86,6 +107,19 @@ final allReadsProvider =
 
       return ref.watch(readingLogRepositoryProvider).watchAllReads(userId);
     });
+
+// Years with an ended read, newest first, for the stats year menu.
+// Always includes this year, so the menu is never empty.
+final readYearsProvider = Provider.autoDispose<List<int>>((ref) {
+  final reads = ref.watch(allReadsProvider).valueOrNull ?? const [];
+  final years = {
+    DateTime.now().year,
+    for (final r in reads)
+      if (r.read.endedAt case final end?) end.year,
+  };
+
+  return years.toList()..sort((a, b) => b.compareTo(a));
+});
 
 // Stats for one year, or all time when null
 final readingStatsProvider = Provider.autoDispose
