@@ -13,6 +13,7 @@ class BookModel {
   final String? libraryId; // from the doc path when loaded, never stored
   final DateTime? addedAt;
   final int noOfCopies; // physical copies of this edition
+  final int lentCount; // copies out on loan; only LoanRepository writes it
 
   // Provider ids, kept as matching hints.
   final String? googleBooksId;
@@ -49,6 +50,7 @@ class BookModel {
     this.libraryId,
     this.addedAt,
     this.noOfCopies = 1,
+    this.lentCount = 0,
     this.googleBooksId,
     this.workId,
     this.isbn,
@@ -91,6 +93,7 @@ class BookModel {
         id: id,
         addedAt: (map['addedAt'] as Timestamp?)?.toDate(),
         noOfCopies: (map['noOfCopies'] as num?)?.toInt(),
+        lentCount: (map['lentCount'] as num?)?.toInt(),
         acquisition: map['acquisition'] as String?,
         originalLanguage: map['originalLanguage'] as String?,
       );
@@ -123,6 +126,7 @@ class BookModel {
     String? libraryId,
     DateTime? addedAt,
     int? noOfCopies,
+    int? lentCount,
     String? acquisition,
     String? originalLanguage,
   }) => BookModel(
@@ -130,6 +134,7 @@ class BookModel {
     libraryId: libraryId ?? this.libraryId,
     addedAt: addedAt ?? this.addedAt,
     noOfCopies: noOfCopies ?? this.noOfCopies,
+    lentCount: lentCount ?? this.lentCount,
     googleBooksId: googleBooksId,
     workId: workId,
     isbn: isbn,
@@ -147,6 +152,9 @@ class BookModel {
     acquisition: acquisition ?? this.acquisition,
     originalLanguage: originalLanguage ?? this.originalLanguage,
   );
+
+  /// Copies on the shelf right now.
+  int get availableCopies => noOfCopies - lentCount;
 
   /// "A, B" for display; null when there are no authors.
   String? get authorLine => authors.isEmpty ? null : authors.join(', ');

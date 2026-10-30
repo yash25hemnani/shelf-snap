@@ -3,11 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/widgets/language_sheet.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/date_format.dart';
 import 'package:shelf_snap/core/utils/languages.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/core/widgets/text_dialog.dart';
+import 'package:shelf_snap/features/lending/models/loan_model.dart';
+import 'package:shelf_snap/features/lending/providers/loan_provider.dart';
+import 'package:shelf_snap/features/lending/repositories/loan_repository.dart';
+import 'package:shelf_snap/features/lending/sheets/request_loan_sheet.dart';
+import 'package:shelf_snap/features/lending/widgets/book_loans_card.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
@@ -324,6 +331,19 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // Viewers can ask to borrow; editors manage loans instead
+                  if (library != null &&
+                      !canEdit &&
+                      libraryId != null &&
+                      bookId != null) ...[
+                    _BorrowCard(book: book, library: library),
+                    const SizedBox(height: 12),
+                  ],
+                  if (canEdit && libraryId != null && bookId != null) ...[
+                    BookLoansCard(libraryId: libraryId, book: book),
+                    const SizedBox(height: 12),
+                  ],
+
                   // Only books on the reading list have something to show
                   if (log != null && readingKey != null) ...[
                     SectionCard(
@@ -526,6 +546,157 @@ class _InfoRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
       child: row,
+    );
+  }
+}
+
+// The viewer's side of lending: ask for the book, or follow their request
+class _BorrowCard extends ConsumerWidget {
+  final BookModel book;
+  final LibraryModel library;
+
+  const _BorrowCard({required this.book, required this.library});
+
+  Future<void> _ask(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final sent = await showRequestLoanSheet(
+      context,
+      book: book,
+      library: library,
+    );
+    if (sent == true) messenger.showMessage('Request sent');
+  }
+
+  Future<void> _cancel(
+    BuildContext context,
+    WidgetRef ref,
+    LoanModel loan,
+  ) async {
+    final userId = AuthService().currentUser?.uid;
+    final loanId = loan.id;
+    if (userId == null || loanId == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(loanRepositoryProvider).cancelLoan(loanId, userId);
+      messenger.showMessage('Request cancelled');
+    } catch (e) {
+      debugPrint('cancelLoan failed: $e');
+      messenger.showError(
+        loanErrorText(e, "Couldn't cancel, check your connection"),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final muted = textTheme.bodyMedium?.copyWith(
+      color: AppColors.textSecondary,
+    );
+
+    final loanAsync = ref.watch(
+      myBookLoanProvider((libraryId: library.id!, bookId: book.id!)),
+    );
+    // Nothing until we know, so the button doesn't flash before a request
+    if (!loanAsync.hasValue) return const SizedBox.shrink();
+    final loan = loanAsync.value;
+
+    String? dates(DateTime? from, DateTime? to) => switch ((from, to)) {
+      (null, null) => null,
+      (final f?, null) => 'Wants it from ${dayMonth(f)}',
+      (null, final t?) => 'Wants it until ${dayMonth(t)}',
+      (final f?, final t?) => 'Wants it ${dayMonth(f)} – ${dayMonth(t)}',
+    };
+
+    final cancelButton = loan == null
+        ? null
+        : TextButton(
+            onPressed: () => _cancel(context, ref, loan),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Cancel'),
+          );
+
+    final (title, trailing, child) = switch (loan?.status) {
+      LoanStatus.requested => (
+        'Requested',
+        cancelButton,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Waiting for the owner to answer', style: muted),
+            if (dates(loan!.collectOn, loan.dueOn) case final text?) ...[
+              const SizedBox(height: 4),
+              Text(text, style: muted),
+            ],
+          ],
+        ),
+      ),
+      LoanStatus.approved => (
+        'Approved',
+        cancelButton,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Collect it from the owner', style: muted),
+            if (loan!.dueOn case final due?) ...[
+              const SizedBox(height: 4),
+              Text('Return by ${dayMonth(due)}', style: muted),
+            ],
+            if (loan.responseNote case final note?) ...[
+              const SizedBox(height: 4),
+              Text('“$note”', style: muted),
+            ],
+          ],
+        ),
+      ),
+      LoanStatus.lent => (
+        'Borrowed',
+        null,
+        Text(
+          [
+            'You have this book',
+            if (loan!.lentOn case final lent?) 'since ${dayMonth(lent)}',
+            if (loan.dueOn case final due?)
+              loan.isOverdue
+                  ? '· overdue since ${dayMonth(due)}'
+                  : '· return by ${dayMonth(due)}',
+          ].join(' '),
+          style: loan.isOverdue
+              ? textTheme.bodyMedium?.copyWith(color: AppColors.error)
+              : muted,
+        ),
+      ),
+      // No open loan
+      _ => (
+        'Borrow',
+        null,
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              book.availableCopies > 0
+                  ? '${book.availableCopies} of ${book.noOfCopies} '
+                        '${book.noOfCopies == 1 ? 'copy' : 'copies'} available'
+                  : 'All copies are out, but you can still ask',
+              style: muted,
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _ask(context),
+              icon: const Icon(Icons.handshake_outlined),
+              label: const Text('Ask to borrow'),
+            ),
+          ],
+        ),
+      ),
+    };
+
+    return SectionCard(
+      icon: Icons.handshake_outlined,
+      title: title,
+      trailing: trailing,
+      child: child,
     );
   }
 }
