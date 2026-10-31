@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,7 +33,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   late Future<CameraController> _cameraFuture;
 
   ScanMode _mode = ScanMode.add;
-  ScanInput _input = ScanInput.shelf;
+  // Shelf scan uses ML Kit, which has no web version
+  ScanInput _input = kIsWeb ? ScanInput.barcode : ScanInput.shelf;
 
   // ISBN scanned again, highlighted in the status card for a moment
   String? _duplicateIsbn;
@@ -51,7 +53,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       _mode = mode;
     });
 
-    if (mode == ScanMode.discover) _setInput(ScanInput.shelf);
+    if (mode == ScanMode.discover && !kIsWeb) _setInput(ScanInput.shelf);
   }
 
   Future<void> _setInput(ScanInput input) async {
@@ -112,7 +114,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   @override
   void initState() {
     super.initState();
-    _cameraFuture = _setupCamera();
+    if (!kIsWeb) _cameraFuture = _setupCamera();
   }
 
   Future<CameraController> _setupCamera() async {
@@ -215,9 +217,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
         ? session.results.length
         : hits.values.where((h) => h.status == HitStatus.found).length;
 
-    ref.watch(
-      shelfCaptureServiceProvider,
-    ); // keep the OCR service alive while the screen is open
+    // keep the OCR service alive while the screen is open
+    if (!kIsWeb) ref.watch(shelfCaptureServiceProvider);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -274,7 +275,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    if (_mode == ScanMode.add)
+                    if (_mode == ScanMode.add && !kIsWeb)
                       ScanInputToggle(input: _input, onChanged: _setInput),
 
                     const SizedBox(height: 16),

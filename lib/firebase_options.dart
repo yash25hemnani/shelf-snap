@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -56,7 +53,6 @@ class DefaultFirebaseOptions {
     projectId: 'shelf-scan-28d17',
     storageBucket: 'shelf-scan-28d17.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDJ-3P3dwnKePl-TDu0RYNUVuQF-nN8FwU',
     appId: '1:726504803682:ios:8e8b92105f4522f1ba303b',
@@ -64,5 +60,14 @@ class DefaultFirebaseOptions {
     projectId: 'shelf-scan-28d17',
     storageBucket: 'shelf-scan-28d17.firebasestorage.app',
     iosBundleId: 'com.example.shelfSnap',
+  );
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyA4jp9jTl5KOuLaFDjqhPiGnYf8nTkRWKE',
+    appId: '1:726504803682:web:1c5d2df65a32785aba303b',
+    messagingSenderId: '726504803682',
+    projectId: 'shelf-scan-28d17',
+    authDomain: 'shelf-scan-28d17.firebaseapp.com',
+    storageBucket: 'shelf-scan-28d17.firebasestorage.app',
+    measurementId: 'G-M2245LP46T',
   );
 }
