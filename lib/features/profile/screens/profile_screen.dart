@@ -6,6 +6,9 @@ import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/lending/models/loan_model.dart';
+import 'package:shelf_snap/features/lending/providers/loan_provider.dart';
+import 'package:shelf_snap/features/lending/screens/loans_screen.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/profile/providers/user_provider.dart';
 import 'package:shelf_snap/features/profile/screens/edit_profile_screen.dart';
@@ -45,6 +48,14 @@ class ProfileScreen extends ConsumerWidget {
 
     final profile = ref.watch(userProfileProvider(user.uid)).valueOrNull;
     final librariesAsync = ref.watch(userLibrariesProvider(user.uid));
+    // Requests in the user's libraries still waiting for an answer
+    final waiting =
+        ref
+            .watch(loansProvider(LoanDirection.lent))
+            .valueOrNull
+            ?.where((l) => l.status == LoanStatus.requested)
+            .length ??
+        0;
 
     return Scaffold(
       appBar: AppBar(
@@ -136,6 +147,16 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           _MenuRow(
+            icon: Icons.handshake_outlined,
+            label: 'Loans',
+            badge: waiting,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const LoansScreen()),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _MenuRow(
             icon: Icons.people_outline_rounded,
             label: 'Friends',
             comingSoon: true,
@@ -222,12 +243,14 @@ class _MenuRow extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final bool comingSoon;
+  final int badge; // shown as a count when above 0
 
   const _MenuRow({
     required this.icon,
     required this.label,
     required this.onTap,
     this.comingSoon = false,
+    this.badge = 0,
   });
 
   @override
@@ -248,6 +271,8 @@ class _MenuRow extends StatelessWidget {
         title: Text(label),
         trailing: comingSoon
             ? const SoftPill(label: 'Coming soon')
+            : badge > 0
+            ? SoftPill(label: '$badge')
             : const Icon(Icons.chevron_right_rounded, color: AppColors.hint),
       ),
     );
