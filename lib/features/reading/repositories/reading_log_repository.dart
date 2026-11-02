@@ -3,6 +3,7 @@ import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/reading/models/book_rating_model.dart';
 import 'package:shelf_snap/features/reading/models/read_date.dart';
 import 'package:shelf_snap/features/reading/models/read_model.dart';
+import 'package:shelf_snap/features/reading/models/reading_activity_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 
 class ReadingLogRepository {
@@ -18,6 +19,34 @@ class ReadingLogRepository {
 
   CollectionReference<Map<String, dynamic>> _ratings(String userId) =>
       _db.collection('users').doc(userId).collection('ratings');
+
+  CollectionReference<Map<String, dynamic>> _activity(String userId) =>
+      _db.collection('users').doc(userId).collection('activity');
+
+  DocumentReference<Map<String, dynamic>> _activityDoc(
+    String userId,
+    String readId,
+    ActivityType type,
+  ) => _activity(userId).doc(ReadingActivityModel.idFor(readId, type));
+
+  // Adds a feed item in the same transaction as the status change
+  void _addActivity(
+    Transaction tx,
+    String userId,
+    ReadingLogModel log,
+    String readId,
+    ActivityType type,
+  ) {
+    final activity = ReadingActivityModel(
+      id: ReadingActivityModel.idFor(readId, type),
+      type: type,
+      readingKey: log.id!,
+      title: log.title,
+      coverUrl: log.coverUrl,
+      at: DateTime.now(),
+    );
+    tx.set(_activityDoc(userId, readId, type), activity.toMap());
+  }
 
   // The log for one book, keyed by its readingKey; null when there's none
   Stream<ReadingLogModel?> watchLog(String userId, String readingKey) {
@@ -201,6 +230,10 @@ class ReadingLogRepository {
     final batch = _db.batch();
     for (final doc in readsSnap.docs) {
       batch.delete(doc.reference);
+      // Its feed items go too, so friends don't see a book that's gone
+      for (final type in ActivityType.values) {
+        batch.delete(_activityDoc(userId, doc.id, type));
+      }
     }
     batch.delete(logRef);
     // The rating goes too, so re-adding the book starts clean
@@ -280,6 +313,13 @@ class ReadingLogRepository {
           log.copyWith(status: nextStatus, latestRead: newRead).toMap(),
         );
 
+        // Feed item: started, or finished straight away. DNF gets none.
+        if (newRead.isActive) {
+          _addActivity(tx, userId, log, readRef.id, ActivityType.started);
+        } else if (nextStatus == BookStatus.finished) {
+          _addActivity(tx, userId, log, readRef.id, ActivityType.finished);
+        }
+
         return true;
       } else {
         // Back to want to read: the book wasn't really started, so the
@@ -288,6 +328,7 @@ class ReadingLogRepository {
           if (!readModel.isActive) return false; // blocked
 
           tx.delete(readDoc!.reference);
+          tx.delete(_activityDoc(userId, readDoc.id, ActivityType.started));
           tx.set(
             logRef,
             log.copyWith(status: nextStatus, clearLatestRead: true).toMap(),
@@ -307,6 +348,14 @@ class ReadingLogRepository {
           logRef,
           log.copyWith(status: nextStatus, latestRead: updatedModel).toMap(),
         );
+
+        // Finishing adds the feed item; reopening or switching to DNF
+        // takes it back
+        if (nextStatus == BookStatus.finished) {
+          _addActivity(tx, userId, log, readDoc.id, ActivityType.finished);
+        } else if (readModel.status == BookStatus.finished) {
+          tx.delete(_activityDoc(userId, readDoc.id, ActivityType.finished));
+        }
         return true;
       }
     });
@@ -455,7 +504,24 @@ class ReadingLogRepository {
         logRef,
         log.copyWith(status: newRead.status, latestRead: newRead).toMap(),
       );
+      _addActivity(tx, userId, log, readRef.id, ActivityType.started);
     });
+  }
+
+  // A friend's newest feed items, for the Friends card on Home
+  Stream<List<ReadingActivityModel>> watchActivity(
+    String friendUid, {
+    int limit = 3,
+  }) {
+    return _activity(friendUid)
+        .orderBy('at', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => ReadingActivityModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   Future<void> addPreviousRead(
