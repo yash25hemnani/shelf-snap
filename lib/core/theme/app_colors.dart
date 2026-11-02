@@ -8,9 +8,9 @@ class AppColors {
   static const primaryDark = Color(0xFF1F4A36);
   static const primarySoft = Color(0xFFE3EFE8);
   static const onPrimary = Color(0xFFFFFFFF);
-  // Warm book-spine brown for personal touches like ratings, next to the green
-  static const secondary = Color(0xFF7B5B3A);
-  static const secondarySoft = Color(0xFFF3ECE4);
+  // Muted old gold for personal touches like ratings, next to the green
+  static const secondary = Color(0xFFA8842F);
+  static const secondarySoft = Color(0xFFF6F0E1);
   static const onSecondary = Color(0xFFFFFFFF);
 
   // Surfaces
