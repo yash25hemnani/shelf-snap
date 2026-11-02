@@ -71,6 +71,27 @@ final libraryMembersProvider = StreamProvider.autoDispose
           );
     });
 
+// Books in one library matching every word of [query]; for search boxes
+// that keep their own text, like the lend sheet
+final bookQuerySearchProvider = StreamProvider.autoDispose
+    .family<List<BookModel>, ({String libraryId, String query})>((ref, args) {
+      final words = BookModel.sanitizeWords(args.query);
+      if (words.isEmpty) return Stream.value(const []);
+
+      // The longest word narrows the query the most
+      words.sort((a, b) => b.length.compareTo(a.length));
+
+      return ref
+          .watch(libraryRepositoryProvider)
+          .searchBooks(args.libraryId, words.first, limit: 20)
+          .map(
+            (books) => books.where((book) {
+              final tokens = book.searchTokens.toSet();
+              return words.every(tokens.contains);
+            }).toList(),
+          );
+    });
+
 // Text typed in a library's search box
 final bookSearchQueryProvider = StateProvider.autoDispose
     .family<String, String>((ref, libraryId) => '');

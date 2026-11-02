@@ -476,4 +476,96 @@ class LoanRepository {
 
     return snap.docs.isNotEmpty;
   }
+
+  // An editor records a loan made outside the app, maybe long ago. No
+  // request step: it starts as lent and takes a copy off the shelf.
+  // borrowerId links an app user; null for someone typed in by name.
+  Future<String> lendManually({
+    required String libraryId,
+    required BookModel book,
+    required String borrowerName,
+    required String userId,
+    String? borrowerId,
+    DateTime? lentOn,
+    DateTime? dueOn,
+    String? note,
+  }) async {
+    final bookId = book.id;
+    if (bookId == null) throw Exception("This book isn't saved in a library.");
+
+    final library = await _editableLibrary(libraryId, userId);
+
+    final name = borrowerName.trim();
+
+    if (name.isEmpty) {
+      throw Exception("Type who you're lending it to.");
+    }
+
+    if (borrowerId == userId) {
+      throw Exception("You can't lend a book to yourself.");
+    }
+
+    final now = DateTime.now();
+    final lent = lentOn == null || lentOn.isAfter(now) ? now : lentOn;
+
+    if (dueOn != null && !dueOn.isAfter(lent)) {
+      throw Exception("The return date must be after the lent date.");
+    }
+
+    if (borrowerId != null &&
+        await hasActiveRequest(libraryId, bookId, borrowerId)) {
+      throw Exception("$name already has this book or asked for it.");
+    }
+
+    final trimmedNote = note?.trim();
+
+    final bookRef = _db
+        .collection('libraries')
+        .doc(libraryId)
+        .collection('books')
+        .doc(bookId);
+
+    // Made first, since a transaction can only set() a known ref
+    final loanRef = _db.collection('loans').doc();
+
+    await _db.runTransaction((tx) async {
+      final bookSnap = await tx.get(bookRef);
+      final bookData = bookSnap.data();
+
+      if (!bookSnap.exists || bookData == null) {
+        throw Exception("This book is no longer in the library.");
+      }
+
+      final current = BookModel.fromMap(bookId, bookData);
+
+      if (current.lentCount >= current.noOfCopies) {
+        throw Exception("All copies are already lent");
+      }
+
+      tx.set(
+        loanRef,
+        LoanModel(
+          libraryId: libraryId,
+          bookId: bookId,
+          ownerId: library.ownerId,
+          borrowerId: borrowerId ?? '',
+          status: LoanStatus.lent,
+          bookTitle: current.title,
+          coverUrl: current.coverUrl,
+          borrowerName: name,
+          libraryName: library.name,
+          requestedOn: now,
+          lentOn: lent,
+          dueOn: dueOn,
+          requestNote: trimmedNote == null || trimmedNote.isEmpty
+              ? null
+              : trimmedNote,
+        ).toMap(),
+      );
+
+      tx.update(bookRef, {'lentCount': FieldValue.increment(1)});
+    });
+
+    return loanRef.id;
+  }
 }

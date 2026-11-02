@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/date_format.dart';
 
-// A tappable date with a clear button once it's set
+// A tappable date with a clear button once it's set. No onClear means the
+// date can't be removed.
 class LoanDateRow extends StatelessWidget {
   final IconData icon;
   final String label;
   final DateTime? date;
   final VoidCallback onTap;
-  final VoidCallback onClear;
+  final VoidCallback? onClear;
 
   const LoanDateRow({
     super.key,
@@ -16,12 +17,13 @@ class LoanDateRow extends StatelessWidget {
     required this.label,
     required this.date,
     required this.onTap,
-    required this.onClear,
+    this.onClear,
   });
 
   @override
   Widget build(BuildContext context) {
     final date = this.date;
+    final onClear = this.onClear;
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -33,7 +35,7 @@ class LoanDateRow extends StatelessWidget {
           color: date == null ? AppColors.primary : AppColors.textSecondary,
         ),
       ),
-      trailing: date == null
+      trailing: date == null || onClear == null
           ? null
           : IconButton(
               tooltip: 'Clear',

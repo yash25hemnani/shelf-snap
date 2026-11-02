@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
@@ -5,6 +6,7 @@ import 'package:shelf_snap/core/utils/date_format.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/lending/models/loan_model.dart';
 import 'package:shelf_snap/features/lending/providers/loan_provider.dart';
+import 'package:shelf_snap/features/lending/screens/lend_copy_screen.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
 
@@ -38,10 +40,30 @@ class _LoansScreenState extends ConsumerState<LoansScreen> {
         context,
         MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)),
       );
+    } on FirebaseException catch (e) {
+      // A loan added by hand can go to someone outside the library, and
+      // only members can read its books
+      if (e.code == 'permission-denied') {
+        messenger.showMessage(
+          "You're not in ${loan.libraryName}, so the book page is closed",
+        );
+        return;
+      }
+      debugPrint('open loan book failed: $e');
+      messenger.showError("Couldn't open the book, check your connection");
     } catch (e) {
       debugPrint('open loan book failed: $e');
       messenger.showError("Couldn't open the book, check your connection");
     }
+  }
+
+  Future<void> _lend() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final name = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const LendCopyScreen()),
+    );
+    if (name != null) messenger.showMessage('Lent to $name');
   }
 
   @override
@@ -54,6 +76,14 @@ class _LoansScreenState extends ConsumerState<LoansScreen> {
         title: const Text('Loans'),
         titleTextStyle: textTheme.titleMedium,
         titleSpacing: 0,
+        actions: [
+          TextButton.icon(
+            onPressed: _lend,
+            icon: const Icon(Icons.add_rounded),
+            label: const Text('Add manually'),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
@@ -104,7 +134,8 @@ class _LoansScreenState extends ConsumerState<LoansScreen> {
                   );
 
                 return ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                  // Room at the bottom so the button doesn't cover the last row
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                   itemCount: sorted.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (_, i) => _LoanTile(

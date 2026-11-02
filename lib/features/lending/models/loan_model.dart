@@ -132,6 +132,9 @@ class LoanModel {
       dueOn != null &&
       DateTime.now().isAfter(dueOn!);
 
+  // Lent to someone not on the app, typed in by name
+  bool get isOffApp => borrowerId.isEmpty;
+
   // A copy with the given fields changed. Passing null keeps the current
   // value, so use [clearDueOn] to remove the due date.
   LoanModel copyWith({
