@@ -47,3 +47,9 @@ app.*.map.json
 .env
 # Claude Code
 .claude/
+
+# GSD planning docs (local only)
+.planning/
+
+# Firebase deploy cache
+.firebase/
