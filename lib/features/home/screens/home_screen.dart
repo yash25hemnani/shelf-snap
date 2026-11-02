@@ -3,7 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/date_format.dart';
+import 'package:shelf_snap/core/widgets/clay_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/friends/models/feed_item.dart';
+import 'package:shelf_snap/features/friends/providers/feed_provider.dart';
+import 'package:shelf_snap/features/friends/screens/friend_screen.dart';
+import 'package:shelf_snap/features/friends/screens/friends_screen.dart';
 import 'package:shelf_snap/features/invites/providers/invite_provider.dart';
 import 'package:shelf_snap/features/invites/screens/notifications_screen.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
@@ -18,8 +24,9 @@ import 'package:shelf_snap/features/reading/screens/reading_log_detail_screen.da
 import 'package:shelf_snap/features/reading/screens/reading_logs_screen.dart';
 import 'package:shelf_snap/features/reading/screens/reading_stats_screen.dart';
 
-// The first tab: a greeting, this year's numbers, books in progress and
-// the user's libraries. Every section shows, with its own empty state.
+// The first tab: a greeting, this year's numbers, books in progress,
+// friends' recent activity and the user's libraries. Every section shows
+// with its own empty state, except Friends, which hides when empty.
 class HomeScreen extends ConsumerWidget {
   final VoidCallback onOpenLibraries; // jumps to the Library tab
 
@@ -53,6 +60,7 @@ class HomeScreen extends ConsumerWidget {
     ];
     final libraries =
         ref.watch(userLibrariesProvider(uid)).valueOrNull ?? const [];
+    final feed = ref.watch(friendsFeedProvider);
 
     return Scaffold(
       // No app bar: the header runs up behind the status bar
@@ -120,6 +128,25 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                   const SizedBox(height: 24),
+
+                  // Hidden until there's something to show: no friends yet,
+                  // or still loading
+                  if (feed.isNotEmpty) ...[
+                    _SectionTitle(
+                      icon: Icons.people_alt_rounded,
+                      title: 'Friends',
+                      onSeeAll: () => _push(context, const FriendsScreen()),
+                    ),
+                    const SizedBox(height: 8),
+                    _FriendsCard(
+                      items: feed,
+                      onOpen: (item) => _push(
+                        context,
+                        FriendScreen(friendship: item.friendship, myUid: uid),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                  ],
 
                   _SectionTitle(
                     icon: Icons.layers_rounded,
@@ -627,6 +654,97 @@ class _ContinueCard extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Friends' newest activity in one bordered card, a row per item
+class _FriendsCard extends StatelessWidget {
+  final List<FeedItem> items;
+  final ValueChanged<FeedItem> onOpen;
+
+  const _FriendsCard({required this.items, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.background,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.border),
+            _FeedRow(item: items[i], onTap: () => onOpen(items[i])),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// "@sam finished Dune" with the date under it and the cover on the right
+class _FeedRow extends StatelessWidget {
+  final FeedItem item;
+  final VoidCallback onTap;
+
+  const _FeedRow({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final bold = textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+    final user = TextSpan(text: '@${item.username}', style: bold);
+    final book = TextSpan(text: item.title, style: bold);
+
+    final spans = switch (item.type) {
+      FeedItemType.started => [user, const TextSpan(text: ' started '), book],
+      FeedItemType.finished => [user, const TextSpan(text: ' finished '), book],
+      FeedItemType.becameFriends => [
+        const TextSpan(text: 'You and '),
+        user,
+        const TextSpan(text: ' became friends'),
+      ],
+    };
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            // Clay avatar from the uid, so the card needs no profile reads
+            ClayAvatar(seed: item.friendUid, radius: 18),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text.rich(
+                    TextSpan(children: spans),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodyMedium,
+                  ),
+                  Text(
+                    dayMonth(item.at),
+                    style: textTheme.labelSmall?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (item.type != FeedItemType.becameFriends) ...[
+              const SizedBox(width: 12),
+              _Cover(url: item.coverUrl, width: 32, height: 48),
+            ],
+          ],
         ),
       ),
     );
