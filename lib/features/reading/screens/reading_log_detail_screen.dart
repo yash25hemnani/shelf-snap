@@ -532,211 +532,28 @@ class _ReadingLogDetailScreenState
 
                       // Want to read has no read, so no progress or dates
                       if (hasPages && read != null) ...[
-                        SectionCard(
-                          title: 'Progress',
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text('Current page', style: muted),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  // The page number is the main thing on the
-                                  // page. The soft box makes it read as a
-                                  // field; tap it to type an exact page.
-                                  // Only a reading or paused read takes
-                                  // progress.
-                                  Material(
-                                    color: read.isActive
-                                        ? AppColors.primarySoft
-                                        : AppColors.surfaceMuted,
-                                    borderRadius: BorderRadius.circular(12),
-                                    clipBehavior: Clip.antiAlias,
-                                    child: InkWell(
-                                      onTap: read.isActive
-                                          ? () => _editProgress(
-                                              currentPage,
-                                              pageCount,
-                                            )
-                                          : null,
-                                      child: Padding(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 14,
-                                          vertical: 6,
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.baseline,
-                                          textBaseline: TextBaseline.alphabetic,
-                                          children: [
-                                            Text(
-                                              '$currentPage',
-                                              style: textTheme.headlineLarge
-                                                  ?.copyWith(
-                                                    fontWeight: FontWeight.w700,
-                                                    color:
-                                                        AppColors.primaryDark,
-                                                  ),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text('of $pageCount', style: muted),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  // Spelled out, so a new user sees how to
-                                  // change the page without guessing
-                                  if (read.isActive)
-                                    FilledButton.tonal(
-                                      onPressed: () =>
-                                          _editProgress(currentPage, pageCount),
-                                      child: const Text('Update'),
-                                    ),
-                                ],
-                              ),
-                              // Drag to move the page; saved when the finger
-                              // lifts. Ended reads show it but can't be dragged.
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: SliderTheme(
-                                      data: SliderTheme.of(context).copyWith(
-                                        trackHeight: 6,
-                                        activeTrackColor: AppColors.primary,
-                                        inactiveTrackColor: AppColors.border,
-                                        thumbColor: AppColors.primary,
-                                        disabledActiveTrackColor:
-                                            AppColors.primary,
-                                        disabledInactiveTrackColor:
-                                            AppColors.border,
-                                        disabledThumbColor: AppColors.primary,
-                                        overlayShape:
-                                            const RoundSliderOverlayShape(
-                                              overlayRadius: 16,
-                                            ),
-                                      ),
-                                      child: Slider(
-                                        // No side padding, so the track lines up
-                                        // with the text above it
-                                        padding: const EdgeInsets.only(
-                                          top: 12,
-                                          bottom: 8,
-                                        ),
-                                        value: currentPage.toDouble(),
-                                        max: pageCount.toDouble(),
-                                        onChanged: read.isActive
-                                            ? (v) => setState(
-                                                () => _dragPage = v.round(),
-                                              )
-                                            : null,
-                                        onChangeEnd: read.isActive
-                                            ? (v) => _saveProgress(v.round())
-                                            : null,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    '$percent%',
-                                    style: textTheme.titleMedium?.copyWith(
-                                      color: AppColors.primary,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // Tap to fix the dates
-                              InkWell(
-                                onTap: () => _editDates(read),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.calendar_today_outlined,
-                                        size: 16,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          _datesLabel(read),
-                                          style: muted,
-                                        ),
-                                      ),
-                                      // A word, not a chevron, so it's clear
-                                      // the dates can be changed
-                                      Text(
-                                        'Edit',
-                                        style: textTheme.labelLarge?.copyWith(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                              // Saved on the last page but not finished yet.
-                              // Uses the saved page, so it waits for the drag
-                              // to end.
-                              if (read.isActive &&
+                        _ProgressCard(
+                          currentPage: currentPage,
+                          pageCount: pageCount,
+                          percent: percent,
+                          active: read.isActive,
+                          pace: read.isActive ? pace : null,
+                          onEditPage: () =>
+                              _editProgress(currentPage, pageCount),
+                          onDrag: (page) => setState(() => _dragPage = page),
+                          onDragEnd: _saveProgress,
+                          // Saved on the last page but not finished yet. Uses
+                          // the saved page, so it waits for the drag to end.
+                          onFinish:
+                              read.isActive &&
                                   _dragPage == null &&
-                                  savedPage >= pageCount) ...[
-                                const SizedBox(height: 12),
-                                FilledButton.icon(
-                                  onPressed: () => _onStatusChanged(
-                                    log,
-                                    BookStatus.finished,
-                                  ),
-                                  icon: const Icon(Icons.check_circle_rounded),
-                                  label: const Text('Mark as finished'),
-                                ),
-                              ],
-                            ],
-                          ),
+                                  savedPage >= pageCount
+                              ? () => _onStatusChanged(log, BookStatus.finished)
+                              : null,
                         ),
-                        // Worked out from the start date and the page, so
-                        // they cost no extra reads; they follow the drag
-                        if (read.isActive && pace != null) ...[
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: _StatTile(
-                                  value: '${pace.days}',
-                                  label: pace.days == 1
-                                      ? 'day reading'
-                                      : 'days reading',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _StatTile(
-                                  value: '${pace.perDay}',
-                                  label: 'pages a day',
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: _StatTile(
-                                  value: pace.finishBy == null
-                                      ? '–'
-                                      : dayMonth(pace.finishBy!),
-                                  label: 'finish by',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
                         // A new read; this one stays in the history
                         if (!read.isActive) ...[
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 12),
                           OutlinedButton.icon(
                             onPressed: _startAgain,
                             icon: const Icon(Icons.replay_rounded),
@@ -747,6 +564,37 @@ class _ReadingLogDetailScreenState
                             ),
                           ),
                         ],
+                      ],
+
+                      // The smaller things in one list, so they read as part
+                      // of the page instead of loose lines of text
+                      if (hasPages) ...[
+                        const SizedBox(height: 16),
+                        _DetailsList(
+                          rows: [
+                            if (read != null)
+                              _DetailRow(
+                                icon: Icons.calendar_today_outlined,
+                                title: _datesLabel(read),
+                                action: 'Edit',
+                                onTap: () => _editDates(read),
+                              ),
+                            // Says rating exists before it unlocks
+                            if (!canRate && read != null)
+                              const _DetailRow(
+                                icon: Icons.star_outline_rounded,
+                                title: 'Rating and review',
+                                subtitle: 'Opens when you finish',
+                              ),
+                            if (history.isEmpty)
+                              _DetailRow(
+                                icon: Icons.history_rounded,
+                                title: 'Read this before?',
+                                action: 'Add',
+                                onTap: _addPreviousRead,
+                              ),
+                          ],
+                        ),
                       ],
 
                       if (canRate) ...[
@@ -775,27 +623,6 @@ class _ReadingLogDetailScreenState
                           child: review == null
                               ? Text('No review yet', style: muted)
                               : Text(review, style: textTheme.bodyMedium),
-                        ),
-                      ],
-
-                      // Says the feature exists before it unlocks
-                      if (!canRate && read != null) ...[
-                        const SizedBox(height: 16),
-                        Text('Rate and review when you finish.', style: muted),
-                      ],
-
-                      // One line until there's a past read, so it's easy to
-                      // find without an empty card
-                      if (hasPages && history.isEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text('Read this before?', style: muted),
-                            TextButton(
-                              onPressed: _addPreviousRead,
-                              child: const Text('Add a past read'),
-                            ),
-                          ],
                         ),
                       ],
 
@@ -886,23 +713,171 @@ class _RatingRow extends StatelessWidget {
   }
 }
 
-// One reading-pace fact under the Progress card: a value over a label
-class _StatTile extends StatelessWidget {
+// The main thing on the page: a white card with the page number, the
+// slider and the reading pace, all in one place
+class _ProgressCard extends StatelessWidget {
+  final int currentPage;
+  final int pageCount;
+  final int percent;
+  // Only a reading or paused read takes progress
+  final bool active;
+  final ({int days, int perDay, DateTime? finishBy})? pace;
+  final VoidCallback onEditPage;
+  final ValueChanged<int> onDrag;
+  final ValueChanged<int> onDragEnd;
+  // Set when the last page is saved but the book isn't finished yet
+  final VoidCallback? onFinish;
+
+  const _ProgressCard({
+    required this.currentPage,
+    required this.pageCount,
+    required this.percent,
+    required this.active,
+    required this.pace,
+    required this.onEditPage,
+    required this.onDrag,
+    required this.onDragEnd,
+    required this.onFinish,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    const faded = AppColors.textSecondary;
+    final pace = this.pace;
+    final onFinish = this.onFinish;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  active ? 'Current page' : 'Pages read',
+                  style: textTheme.labelLarge?.copyWith(color: faded),
+                ),
+              ),
+              Text(
+                '$percent%',
+                style: textTheme.titleMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              // Tap the number to type an exact page
+              Expanded(
+                child: GestureDetector(
+                  onTap: active ? onEditPage : null,
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.baseline,
+                    textBaseline: TextBaseline.alphabetic,
+                    children: [
+                      Text(
+                        '$currentPage',
+                        style: textTheme.displaySmall?.copyWith(
+                          color: AppColors.text,
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '/ $pageCount',
+                        style: textTheme.titleMedium?.copyWith(color: faded),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              // Spelled out, so a new user sees how to change the page
+              if (active)
+                FilledButton(
+                  onPressed: onEditPage,
+                  child: const Text('Update'),
+                ),
+            ],
+          ),
+          // Drag to move the page; saved when the finger lifts.
+          // Ended reads show it but can't be dragged.
+          SliderTheme(
+            data: SliderTheme.of(context).copyWith(
+              trackHeight: 6,
+              activeTrackColor: AppColors.primary,
+              inactiveTrackColor: AppColors.border,
+              thumbColor: AppColors.primary,
+              overlayColor: AppColors.primary.withValues(alpha: 0.12),
+              disabledActiveTrackColor: AppColors.primary,
+              disabledInactiveTrackColor: AppColors.border,
+              disabledThumbColor: AppColors.primary,
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+            ),
+            child: Slider(
+              // No side padding, so the track lines up with the text
+              padding: const EdgeInsets.only(top: 12, bottom: 8),
+              value: currentPage.toDouble(),
+              max: pageCount.toDouble(),
+              onChanged: active ? (v) => onDrag(v.round()) : null,
+              onChangeEnd: active ? (v) => onDragEnd(v.round()) : null,
+            ),
+          ),
+          if (onFinish != null) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: onFinish,
+              icon: const Icon(Icons.check_circle_rounded),
+              label: const Text('Mark as finished'),
+            ),
+          ],
+          // Worked out from the start date and the page, so they cost no
+          // extra reads; they follow the drag
+          if (pace != null) ...[
+            const Divider(height: 24, color: AppColors.border),
+            Row(
+              children: [
+                _PaceStat(
+                  value: '${pace.days}',
+                  label: pace.days == 1 ? 'day reading' : 'days reading',
+                ),
+                _PaceStat(value: '${pace.perDay}', label: 'pages a day'),
+                _PaceStat(
+                  value: pace.finishBy == null ? '–' : dayMonth(pace.finishBy!),
+                  label: 'finish by',
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// One pace fact on the progress card: a bold value over a muted label
+class _PaceStat extends StatelessWidget {
   final String value;
   final String label;
 
-  const _StatTile({required this.value, required this.label});
+  const _PaceStat({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    return Expanded(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -910,7 +885,10 @@ class _StatTile extends StatelessWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            style: textTheme.titleLarge?.copyWith(
+              color: AppColors.text,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           Text(
             label,
@@ -921,6 +899,95 @@ class _StatTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// A bordered list of small rows with thin lines between them
+class _DetailsList extends StatelessWidget {
+  final List<_DetailRow> rows;
+
+  const _DetailsList({required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.background,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          for (final row in rows) ...[
+            row,
+            // Starts after the icon, so the icons read as one column
+            if (row != rows.last)
+              const Divider(height: 1, indent: 52, color: AppColors.border),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// An icon, a line of text and an optional green action word on the right
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final String? action;
+  final VoidCallback? onTap;
+
+  const _DetailRow({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.action,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final subtitle = this.subtitle;
+    final action = this.action;
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.textSecondary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: textTheme.bodyMedium),
+                  if (subtitle != null)
+                    Text(
+                      subtitle,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (action != null)
+              Text(
+                action,
+                style: textTheme.labelLarge?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
