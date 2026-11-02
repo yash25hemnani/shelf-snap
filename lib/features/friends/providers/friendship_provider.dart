@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/friends/models/friendship_model.dart';
 import 'package:shelf_snap/features/friends/repositories/friendship_repository.dart';
+import 'package:shelf_snap/features/profile/models/user_model.dart';
+import 'package:shelf_snap/features/profile/providers/user_provider.dart';
 
 final friendshipRepositoryProvider = Provider((ref) => FriendshipRepository());
 
@@ -34,6 +36,14 @@ final incomingRequestsProvider = Provider<AsyncValue<List<FriendshipModel>>>((
             : all.where((f) => f.isIncoming(uid)).toList(),
       );
 });
+
+// Another person's profile, for names and avatars. userProfileProvider
+// only loads the signed-in user, so friends need their own.
+final otherUserProvider = StreamProvider.autoDispose.family<UserModel?, String>(
+  (ref, uid) {
+    return ref.watch(userRepositoryProvider).watchUser(uid);
+  },
+);
 
 // Requests I sent that haven't been answered yet
 final sentRequestsProvider = Provider<AsyncValue<List<FriendshipModel>>>((ref) {
