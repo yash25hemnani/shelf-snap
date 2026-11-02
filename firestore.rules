@@ -141,6 +141,20 @@ service cloud.firestore {
         return getAfter(p).data.get('lentCount', 0) == get(p).data.get('lentCount', 0) + by;
       }
 
+      // On create: the book's lentCount goes up by one in this transaction
+      function newLoanTakesCopy() {
+        let p = /databases/$(database)/documents/libraries/$(request.resource.data.libraryId)/books/$(request.resource.data.bookId);
+        return getAfter(p).data.get('lentCount', 0) == get(p).data.get('lentCount', 0) + 1;
+      }
+
+      function loanKeys() {
+        return [
+          'libraryId', 'bookId', 'ownerId', 'borrowerId', 'status',
+          'bookTitle', 'coverUrl', 'borrowerName', 'libraryName',
+          'requestedOn', 'respondedOn', 'lentOn', 'collectOn', 'dueOn',
+          'returnedOn', 'requestNote', 'responseNote'];
+      }
+
       // A lost copy leaves the library: one copy fewer (lent and owned),
       // the book deleted when it was the last one, or it was already gone
       function copyLost() {
@@ -174,11 +188,7 @@ service cloud.firestore {
       allow read: if signedIn() && (isBorrower() || isManager());
 
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly([
-             'libraryId', 'bookId', 'ownerId', 'borrowerId', 'status',
-             'bookTitle', 'coverUrl', 'borrowerName', 'libraryName',
-             'requestedOn', 'respondedOn', 'lentOn', 'collectOn', 'dueOn',
-             'returnedOn', 'requestNote', 'responseNote'])
+        && request.resource.data.keys().hasOnly(loanKeys())
         && request.resource.data.borrowerId == uid()
         && request.resource.data.status == 'requested'
         && request.resource.data.requestedOn is timestamp
@@ -188,6 +198,41 @@ service cloud.firestore {
         && request.resource.data.get('responseNote', null) == null
         && validRequestDates()
         && validRequestLibrary();
+
+      // Lent on today or earlier (a loan from before the app), and returned
+      // after it was lent, so an old loan can already be overdue. The hour
+      // of slack covers a phone clock running fast.
+      function validManualDates() {
+        let d = request.resource.data;
+        let due = d.get('dueOn', null);
+        return d.lentOn is timestamp
+          && d.lentOn <= request.time + duration.value(1, 'h')
+          && d.get('collectOn', null) == null
+          && (due == null || (due is timestamp && due > d.lentOn));
+      }
+
+      // Someone typed in by name, or an app user other than the editor
+      function validManualBorrower() {
+        let id = request.resource.data.borrowerId;
+        return id == ''
+          || (id is string && id != uid()
+              && exists(/databases/$(database)/documents/users/$(id)));
+      }
+
+      // An editor recording a loan made outside the app: starts as lent
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(loanKeys())
+        && validManualBorrower()
+        && request.resource.data.borrowerName is string
+        && request.resource.data.borrowerName.size() > 0
+        && request.resource.data.status == 'lent'
+        && request.resource.data.requestedOn is timestamp
+        && request.resource.data.get('respondedOn', null) == null
+        && request.resource.data.get('returnedOn', null) == null
+        && validManualDates()
+        && request.resource.data.ownerId == libraryData(request.resource.data.libraryId).ownerId
+        && isEditorOf(libraryData(request.resource.data.libraryId))
+        && newLoanTakesCopy();
 
       // Borrower withdraws before the handover
       allow update: if signedIn() && isBorrower()
