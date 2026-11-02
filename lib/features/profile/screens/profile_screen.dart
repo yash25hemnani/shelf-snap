@@ -38,6 +38,10 @@ class ProfileScreen extends ConsumerWidget {
     ScaffoldMessenger.of(context).showMessage('Coming soon');
   }
 
+  void _push(BuildContext context, Widget screen) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -49,7 +53,7 @@ class ProfileScreen extends ConsumerWidget {
     }
 
     final profile = ref.watch(userProfileProvider(user.uid)).valueOrNull;
-    final librariesAsync = ref.watch(userLibrariesProvider(user.uid));
+    final libraries = ref.watch(userLibrariesProvider(user.uid)).valueOrNull;
     // Requests in the user's libraries still waiting for an answer
     final waiting =
         ref
@@ -74,12 +78,8 @@ class ProfileScreen extends ConsumerWidget {
             IconButton(
               tooltip: 'Edit profile',
               icon: const Icon(Icons.edit_outlined),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => EditProfileScreen(profile: profile),
-                ),
-              ),
+              onPressed: () =>
+                  _push(context, EditProfileScreen(profile: profile)),
             ),
           const SizedBox(width: 8),
         ],
@@ -112,81 +112,92 @@ class ProfileScreen extends ConsumerWidget {
             ),
           const SizedBox(height: 24),
 
-          // Libraries, Books and Friends, each in its own card
-          Row(
-            children: [
-              _Stat(
-                value: librariesAsync.valueOrNull?.length,
-                label: 'Libraries',
-              ),
-              const SizedBox(width: 8),
-              _Stat(
-                // Libraries store their own counts, so no extra reads
-                value: librariesAsync.valueOrNull?.fold<int>(
-                  0,
-                  (sum, library) => sum + library.bookCount,
-                ),
-                label: 'Books',
-              ),
-              const SizedBox(width: 8),
-              _Stat(value: friendCount, label: 'Friends'),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          _MenuRow(
-            icon: Icons.auto_stories_outlined,
-            label: 'Reading logs',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReadingLogsScreen()),
+          _StatsCard(
+            libraries: libraries?.length,
+            // Libraries store their own counts, so no extra reads
+            books: libraries?.fold<int>(
+              0,
+              (sum, library) => sum + library.bookCount,
             ),
-          ),
-          const SizedBox(height: 8),
-          _MenuRow(
-            icon: Icons.insights_outlined,
-            label: 'Reading stats',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReadingStatsScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _MenuRow(
-            icon: Icons.handshake_outlined,
-            label: 'Loans',
-            badge: waiting,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const LoansScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _MenuRow(
-            icon: Icons.people_outline_rounded,
-            label: 'Friends',
-            badge: incomingCount,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const FriendsScreen()),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _MenuRow(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-            comingSoon: true,
-            onTap: () => _comingSoon(context),
+            friends: friendCount,
           ),
           const SizedBox(height: 16),
 
-          TextButton.icon(
-            onPressed: () => _confirmSignOut(context),
-            icon: const Icon(Icons.logout_rounded),
-            label: const Text('Sign out'),
-            style: TextButton.styleFrom(
-              foregroundColor: AppColors.error,
-              minimumSize: const Size.fromHeight(52), // full width
+          Row(
+            children: [
+              _Tile(
+                color: AppColors.primary,
+                icon: Icons.auto_stories_rounded,
+                title: 'Reading logs',
+                subtitle: 'Your books',
+                onTap: () => _push(context, const ReadingLogsScreen()),
+              ),
+              const SizedBox(width: 12),
+              _Tile(
+                color: AppColors.accent,
+                icon: Icons.insights_rounded,
+                title: 'Stats',
+                subtitle: 'This year',
+                onTap: () => _push(context, const ReadingStatsScreen()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _Tile(
+                color: AppColors.secondary,
+                icon: Icons.handshake_rounded,
+                title: 'Loans',
+                subtitle: waiting > 0 ? '$waiting waiting' : 'Lent & borrowed',
+                badge: waiting,
+                onTap: () => _push(context, const LoansScreen()),
+              ),
+              const SizedBox(width: 12),
+              _Tile(
+                color: AppColors.primaryDark,
+                icon: Icons.people_alt_rounded,
+                title: 'Friends',
+                subtitle: incomingCount > 0
+                    ? '$incomingCount new request${incomingCount == 1 ? '' : 's'}'
+                    : friendCount == null
+                    ? ' '
+                    : '$friendCount friend${friendCount == 1 ? '' : 's'}',
+                badge: incomingCount,
+                onTap: () => _push(context, const FriendsScreen()),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Plain rows: a "Coming soon" tile would look broken
+          _Card(
+            child: Column(
+              children: [
+                ListTile(
+                  onTap: () => _comingSoon(context),
+                  leading: const Icon(
+                    Icons.settings_outlined,
+                    color: AppColors.textSecondary,
+                  ),
+                  title: const Text('Settings'),
+                  trailing: const SoftPill(label: 'Coming soon'),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  onTap: () => _confirmSignOut(context),
+                  leading: const Icon(
+                    Icons.logout_rounded,
+                    color: AppColors.error,
+                  ),
+                  title: Text(
+                    'Sign out',
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: AppColors.error,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -198,18 +209,16 @@ class ProfileScreen extends ConsumerWidget {
 // White rounded card with a light border
 class _Card extends StatelessWidget {
   final Widget child;
-  final EdgeInsetsGeometry? padding;
 
-  const _Card({required this.child, this.padding});
+  const _Card({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: padding,
       clipBehavior: Clip.antiAlias, // keeps row ripples inside the corners
       decoration: BoxDecoration(
         color: AppColors.background,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: child,
@@ -217,73 +226,156 @@ class _Card extends StatelessWidget {
   }
 }
 
-// A card with one number over its label; null shows "–"
-class _Stat extends StatelessWidget {
-  final int? value;
-  final String label;
+// Libraries, Books and Friends in one card with thin dividers; null shows "–"
+class _StatsCard extends StatelessWidget {
+  final int? libraries;
+  final int? books;
+  final int? friends;
 
-  const _Stat({this.value, required this.label});
+  const _StatsCard({this.libraries, this.books, this.friends});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Expanded(
-      child: _Card(
-        padding: const EdgeInsets.symmetric(vertical: 32),
-        child: Column(
-          children: [
-            Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
+    Widget stat(int? value, String label) => Expanded(
+      child: Column(
+        children: [
+          Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+
+    const divider = VerticalDivider(
+      width: 1,
+      indent: 4,
+      endIndent: 4,
+      color: AppColors.border,
+    );
+
+    return _Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        // Lets the dividers stretch to the height of the numbers
+        child: IntrinsicHeight(
+          child: Row(
+            children: [
+              stat(libraries, 'Libraries'),
+              divider,
+              stat(books, 'Books'),
+              divider,
+              stat(friends, 'Friends'),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-// Full-width card with an icon in a soft square, a label and a chevron
-class _MenuRow extends StatelessWidget {
+// Solid colour tile: white title and subtitle on the left, a large faded
+// icon cut off at the bottom right as a watermark
+class _Tile extends StatelessWidget {
+  final Color color;
   final IconData icon;
-  final String label;
+  final String title;
+  final String subtitle;
   final VoidCallback onTap;
-  final bool comingSoon;
-  final int badge; // shown as a count when above 0
+  final int badge; // shown as a white pill when above 0
 
-  const _MenuRow({
+  const _Tile({
+    required this.color,
     required this.icon,
-    required this.label,
+    required this.title,
+    required this.subtitle,
     required this.onTap,
-    this.comingSoon = false,
     this.badge = 0,
   });
 
   @override
   Widget build(BuildContext context) {
-    return _Card(
-      child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-        leading: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: AppColors.primarySoft,
-            borderRadius: BorderRadius.circular(12),
+    final theme = Theme.of(context);
+
+    return Expanded(
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias, // clips the watermark and the ripple
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            height: 112,
+            child: Stack(
+              children: [
+                Positioned(
+                  right: -16,
+                  bottom: -16,
+                  child: Icon(
+                    icon,
+                    size: 88,
+                    color: AppColors.onPrimary.withValues(alpha: 0.18),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                color: AppColors.onPrimary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          if (badge > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.onPrimary,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                '$badge',
+                                style: theme.textTheme.labelMedium?.copyWith(
+                                  color: color,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.onPrimary.withValues(alpha: 0.85),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: Icon(icon, size: 20, color: AppColors.primaryDark),
         ),
-        title: Text(label),
-        trailing: comingSoon
-            ? const SoftPill(label: 'Coming soon')
-            : badge > 0
-            ? SoftPill(label: '$badge')
-            : const Icon(Icons.chevron_right_rounded, color: AppColors.hint),
       ),
     );
   }
