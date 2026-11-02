@@ -212,5 +212,43 @@ service cloud.firestore {
 
       allow delete: if false;
     }
+
+    // ---------- Friendships ----------
+    // One doc per pair, id is the two uids sorted and joined with '_'
+    match /friendships/{friendshipId} {
+      function userDoc(u) { return get(/databases/$(database)/documents/users/$(u)).data; }
+
+      function pairId(a, b) { return a < b ? a + '_' + b : b + '_' + a; }
+
+      // resource == null: sendRequest reads the doc before it exists
+      allow read: if signedIn()
+        && (resource == null || uid() in resource.data.uids);
+
+      // The sender asks; usernames must match the real profiles
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'uids', 'fromUid', 'fromUsername', 'toUid', 'toUsername',
+             'status', 'createdAt', 'respondedAt'])
+        && request.resource.data.fromUid == uid()
+        && request.resource.data.toUid != uid()
+        && request.resource.data.uids == [uid(), request.resource.data.toUid]
+        && friendshipId == pairId(uid(), request.resource.data.toUid)
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is timestamp
+        && request.resource.data.get('respondedAt', null) == null
+        && request.resource.data.fromUsername == userDoc(uid()).username
+        && request.resource.data.toUsername == userDoc(request.resource.data.toUid).username;
+
+      // Only the person asked can accept, once
+      allow update: if signedIn()
+        && resource.data.toUid == uid()
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.respondedAt == request.time
+        && changed().hasOnly(['status', 'respondedAt']);
+
+      // Decline, cancel and unfriend
+      allow delete: if signedIn() && uid() in resource.data.uids;
+    }
   }
 }
