@@ -124,6 +124,29 @@
         },
         {
           "fieldPath": "latestRead.endedAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "pageCount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "readingLogs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "latestRead.endedAt",
           "order": "DESCENDING"
         },
         {
