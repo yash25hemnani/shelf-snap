@@ -53,3 +53,6 @@ app.*.map.json
 
 # Firebase deploy cache
 .firebase/
+
+# Auto-generated Firebase Hosting workflows (broken: run npm, not Flutter)
+.github/
