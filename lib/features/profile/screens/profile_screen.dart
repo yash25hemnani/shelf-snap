@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
-import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
-import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/friends/providers/friendship_provider.dart';
@@ -32,10 +30,6 @@ class ProfileScreen extends ConsumerWidget {
     );
 
     if (confirmed) await AuthService().signOut();
-  }
-
-  void _comingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showMessage('Coming soon');
   }
 
   void _push(BuildContext context, Widget screen) {
@@ -170,34 +164,18 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // Plain rows: a "Coming soon" tile would look broken
+          // Settings stays hidden until it exists; a "Coming soon" row
+          // made the app look unfinished
           _Card(
-            child: Column(
-              children: [
-                ListTile(
-                  onTap: () => _comingSoon(context),
-                  leading: const Icon(
-                    Icons.settings_outlined,
-                    color: AppColors.textSecondary,
-                  ),
-                  title: const Text('Settings'),
-                  trailing: const SoftPill(label: 'Coming soon'),
+            child: ListTile(
+              onTap: () => _confirmSignOut(context),
+              leading: const Icon(Icons.logout_rounded, color: AppColors.error),
+              title: Text(
+                'Sign out',
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: AppColors.error,
                 ),
-                const Divider(height: 1),
-                ListTile(
-                  onTap: () => _confirmSignOut(context),
-                  leading: const Icon(
-                    Icons.logout_rounded,
-                    color: AppColors.error,
-                  ),
-                  title: Text(
-                    'Sign out',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: AppColors.error,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],

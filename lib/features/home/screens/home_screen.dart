@@ -131,134 +131,160 @@ class HomeScreen extends ConsumerWidget {
       // No app bar: the header runs up behind the status bar
       body: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark, // dark status bar icons
-        child: ListView(
-          // Extra bottom space so the last item clears the navbar
-          padding: const EdgeInsets.only(bottom: 32),
+        child: Stack(
           children: [
-            _Header(
-              name: profile?.name.split(' ').first,
-              bell: IconButton(
-                tooltip: 'Notifications',
-                // The badge shows the number of pending invites
-                icon: Badge.count(
-                  count: inviteCount,
-                  isLabelVisible: inviteCount > 0,
-                  child: const Icon(Icons.notifications_none_rounded),
-                ),
-                onPressed: () => _push(context, const NotificationsScreen()),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _StatsCard(
-                    year: year,
-                    stats: stats,
-                    readingNow: inProgress.length,
-                    onTap: () => _push(context, const ReadingStatsScreen()),
-                  ),
-                  const SizedBox(height: 24),
-
-                  _SectionTitle(
-                    icon: Icons.menu_book_rounded,
-                    title: 'Currently reading',
-                    onSeeAll: () => _push(context, const ReadingLogsScreen()),
-                  ),
-                  const SizedBox(height: 8),
-                  if (inProgress.isEmpty)
-                    _EmptyReadingCard(onOpenLibraries: onOpenLibraries)
-                  else ...[
-                    // The book read most recently gets the big card
-                    _HeroReadingCard(
-                      log: inProgress.first,
-                      onTap: open(inProgress.first),
-                      onUpdatePage: () =>
-                          _updatePage(context, ref, inProgress.first, uid),
+            ListView(
+              // Extra bottom space so the last item clears the navbar
+              padding: const EdgeInsets.only(bottom: 32),
+              children: [
+                _Header(
+                  name: profile?.name.split(' ').first,
+                  bell: IconButton(
+                    tooltip: 'Notifications',
+                    // The badge shows the number of pending invites
+                    icon: Badge.count(
+                      count: inviteCount,
+                      isLabelVisible: inviteCount > 0,
+                      child: const Icon(Icons.notifications_none_rounded),
                     ),
-                    if (inProgress.length > 1) ...[
-                      const SizedBox(height: 12),
+                    onPressed: () =>
+                        _push(context, const NotificationsScreen()),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _StatsCard(
+                        year: year,
+                        stats: stats,
+                        readingNow: inProgress.length,
+                        onTap: () => _push(context, const ReadingStatsScreen()),
+                      ),
+                      const SizedBox(height: 24),
+
+                      _SectionTitle(
+                        icon: Icons.menu_book_rounded,
+                        title: 'Currently reading',
+                        onSeeAll: () =>
+                            _push(context, const ReadingLogsScreen()),
+                      ),
+                      const SizedBox(height: 8),
+                      if (inProgress.isEmpty)
+                        _EmptyReadingCard(onOpenLibraries: onOpenLibraries)
+                      else ...[
+                        // The book read most recently gets the big card
+                        _HeroReadingCard(
+                          log: inProgress.first,
+                          onTap: open(inProgress.first),
+                          onUpdatePage: () =>
+                              _updatePage(context, ref, inProgress.first, uid),
+                        ),
+                        if (inProgress.length > 1) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 128,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              // Lets the cards scroll to the screen edge
+                              clipBehavior: Clip.none,
+                              itemCount: inProgress.length - 1,
+                              separatorBuilder: (_, _) =>
+                                  const SizedBox(width: 12),
+                              itemBuilder: (_, i) {
+                                final log = inProgress[i + 1];
+                                return _ContinueCard(
+                                  log: log,
+                                  onTap: open(log),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ],
+                      const SizedBox(height: 24),
+
+                      // Hidden until there's something to show: no friends yet,
+                      // or still loading
+                      if (feed.isNotEmpty) ...[
+                        _SectionTitle(
+                          icon: Icons.people_alt_rounded,
+                          title: 'Friends',
+                          onSeeAll: () => _push(context, const FriendsScreen()),
+                        ),
+                        const SizedBox(height: 8),
+                        _FriendsCard(
+                          items: feed,
+                          onOpen: (item) => _push(
+                            context,
+                            FriendScreen(
+                              friendship: item.friendship,
+                              myUid: uid,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+
+                      _SectionTitle(
+                        icon: Icons.layers_rounded,
+                        title: 'Your libraries',
+                        onSeeAll: onOpenLibraries,
+                      ),
+                      const SizedBox(height: 8),
                       SizedBox(
-                        height: 128,
-                        child: ListView.separated(
+                        height: 150,
+                        child: ListView(
                           scrollDirection: Axis.horizontal,
-                          // Lets the cards scroll to the screen edge
                           clipBehavior: Clip.none,
-                          itemCount: inProgress.length - 1,
-                          separatorBuilder: (_, _) => const SizedBox(width: 12),
-                          itemBuilder: (_, i) {
-                            final log = inProgress[i + 1];
-                            return _ContinueCard(log: log, onTap: open(log));
-                          },
+                          children: [
+                            for (final library in libraries) ...[
+                              _LibraryTile(
+                                library: library,
+                                onTap: () => _push(
+                                  context,
+                                  LibraryDetailScreen(library: library),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                            _NewLibraryTile(
+                              onTap: () => _push(
+                                context,
+                                CreateLibraryScreen(userId: uid),
+                              ),
+                            ),
+                            // With no libraries, explain the lone + card
+                            if (libraries.isEmpty)
+                              Container(
+                                width: 180,
+                                padding: const EdgeInsets.only(left: 16),
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Create a library to start adding books',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: AppColors.textSecondary,
+                                      ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
                     ],
-                  ],
-                  const SizedBox(height: 24),
-
-                  // Hidden until there's something to show: no friends yet,
-                  // or still loading
-                  if (feed.isNotEmpty) ...[
-                    _SectionTitle(
-                      icon: Icons.people_alt_rounded,
-                      title: 'Friends',
-                      onSeeAll: () => _push(context, const FriendsScreen()),
-                    ),
-                    const SizedBox(height: 8),
-                    _FriendsCard(
-                      items: feed,
-                      onOpen: (item) => _push(
-                        context,
-                        FriendScreen(friendship: item.friendship, myUid: uid),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  _SectionTitle(
-                    icon: Icons.layers_rounded,
-                    title: 'Your libraries',
-                    onSeeAll: onOpenLibraries,
                   ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 150,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      children: [
-                        for (final library in libraries) ...[
-                          _LibraryTile(
-                            library: library,
-                            onTap: () => _push(
-                              context,
-                              LibraryDetailScreen(library: library),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                        ],
-                        _NewLibraryTile(
-                          onTap: () =>
-                              _push(context, CreateLibraryScreen(userId: uid)),
-                        ),
-                        // With no libraries, explain the lone + card
-                        if (libraries.isEmpty)
-                          Container(
-                            width: 180,
-                            padding: const EdgeInsets.only(left: 16),
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              'Create a library to start adding books',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: AppColors.textSecondary),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
+            ),
+            // Solid strip over the status bar so scrolled content doesn't
+            // run under the clock; same green as the top of the header
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: MediaQuery.paddingOf(context).top,
+              child: const ColoredBox(color: AppColors.primarySoft),
             ),
           ],
         ),
@@ -501,14 +527,14 @@ class _StatsCard extends StatelessWidget {
               if (stats.finished > 0) ...[
                 const SizedBox(height: 16),
                 SizedBox(
-                  height: 32,
+                  height: 40,
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       for (var i = 0; i < 12; i++)
                         Expanded(
                           child: Container(
-                            height: counts[i] == 0 ? 3 : 32 * counts[i] / most,
+                            height: counts[i] == 0 ? 3 : 40 * counts[i] / most,
                             margin: const EdgeInsets.symmetric(horizontal: 3),
                             decoration: BoxDecoration(
                               // This month is solid white, the rest faded
@@ -525,6 +551,27 @@ class _StatsCard extends StatelessWidget {
                         ),
                     ],
                   ),
+                ),
+                const SizedBox(height: 4),
+                // Month initials so the bars read as a year, not a loader
+                Row(
+                  children: [
+                    for (var i = 0; i < 12; i++)
+                      Expanded(
+                        child: Text(
+                          'JFMAMJJASOND'[i],
+                          textAlign: TextAlign.center,
+                          style: textTheme.labelSmall?.copyWith(
+                            color: AppColors.onPrimary.withValues(
+                              alpha: i + 1 == currentMonth ? 1 : 0.7,
+                            ),
+                            fontWeight: i + 1 == currentMonth
+                                ? FontWeight.w700
+                                : null,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ],

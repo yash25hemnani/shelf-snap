@@ -22,6 +22,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final _searchController = TextEditingController();
   String _query = '';
 
+  void _createLibrary(String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => CreateLibraryScreen(userId: userId)),
+    );
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -92,21 +99,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
               ),
               Expanded(
-                child: visible.isEmpty
-                    ? Center(
-                        child: Text(
-                          items.isEmpty
-                              ? 'No libraries yet. Tap + to create one!'
-                              : 'No libraries match your search',
-                        ),
+                child: visible.isEmpty && _query.isNotEmpty
+                    ? const Center(
+                        child: Text('No libraries match your search'),
                       )
                     : ListView.builder(
-                        // Extra bottom space so the FAB doesn't cover the last card
-                        padding: const EdgeInsets.only(bottom: 88),
+                        // Extra bottom space so the last card clears the navbar
+                        padding: const EdgeInsets.only(bottom: 32),
                         keyboardDismissBehavior:
                             ScrollViewKeyboardDismissBehavior.onDrag,
-                        itemCount: visible.length,
+                        // The New library row is last, hidden while searching
+                        itemCount: visible.length + (_query.isEmpty ? 1 : 0),
                         itemBuilder: (context, index) {
+                          if (index == visible.length) {
+                            return _NewLibraryRow(
+                              onTap: () => _createLibrary(userId),
+                            );
+                          }
                           final library = visible[index];
                           return LibraryCard(
                             library: library,
@@ -127,15 +136,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         error: (err, stack) => Center(child: Text("Error: $err")),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => CreateLibraryScreen(userId: userId),
-          ),
-        ),
-        child: const Icon(Icons.add),
-      ),
     );
   }
 
@@ -148,5 +148,67 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       '${library.name} ${library.description ?? ''}'.toLowerCase(),
     );
     return words.every(text.contains);
+  }
+}
+
+// Last row of the list, in place of a floating + that sat on top of the
+// Scan button: a soft green card with the same margins as a library card
+class _NewLibraryRow extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _NewLibraryRow({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Material(
+        color: AppColors.primarySoft,
+        clipBehavior: Clip.antiAlias,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                // Same size as a library thumbnail so the rows line up
+                Container(
+                  width: 76,
+                  height: 76,
+                  decoration: BoxDecoration(
+                    color: AppColors.background,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: AppColors.primaryDark,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'New library',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: AppColors.primaryDark),
+                      ),
+                      Text(
+                        'A shelf, a room or one you share',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }

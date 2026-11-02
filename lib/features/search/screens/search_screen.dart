@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
 import 'package:shelf_snap/features/library/sheets/save_to_library_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
+import 'package:shelf_snap/features/scanner/screens/scanner_screen.dart';
 import 'package:shelf_snap/features/search/providers/search_provider.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -61,7 +63,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             child: resultsAsync.when(
               data: (books) {
                 if (_query.length < 2) {
-                  return const Center(child: Text('Search for a book to add'));
+                  return _EmptySearch(
+                    onScan: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ScannerScreen(),
+                        fullscreenDialog: true,
+                      ),
+                    ),
+                  );
                 }
 
                 if (books.isEmpty) {
@@ -99,6 +109,63 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Before the first search: what to type, and the barcode scanner as the
+// quicker way when the book is in hand
+class _EmptySearch extends StatelessWidget {
+  final VoidCallback onScan;
+
+  const _EmptySearch({required this.onScan});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                color: AppColors.primarySoft,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.menu_book_rounded,
+                size: 32,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Find a book to add',
+              textAlign: TextAlign.center,
+              style: textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Type a title, an author or the ISBN from the back cover',
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onScan,
+              icon: const Icon(Icons.qr_code_scanner_rounded),
+              label: const Text('Scan a barcode instead'),
+            ),
+          ],
+        ),
       ),
     );
   }
