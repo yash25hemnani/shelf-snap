@@ -13,6 +13,14 @@ service cloud.firestore {
     // Old libraries have no editors list; the owner always counts
     function isEditorOf(lib) { return uid() == lib.ownerId || uid() in lib.get('editors', []); }
 
+    // An accepted friendship with [other]. The friendship id is the two
+    // uids sorted, so it can be looked up directly.
+    function isFriendOf(other) {
+      let pair = other < uid() ? other + '_' + uid() : uid() + '_' + other;
+      let f = /databases/$(database)/documents/friendships/$(pair);
+      return signedIn() && exists(f) && get(f).data.status == 'accepted';
+    }
+
     // ---------- Users ----------
     match /users/{userId} {
       allow read: if signedIn();                    // search, member lists
@@ -22,7 +30,12 @@ service cloud.firestore {
       allow delete: if false;
 
       match /readingLogs/{readingKey} {
-        allow read, delete: if uid() == userId;
+        // Friends see started and ended books, never want to read. Their
+        // queries must filter on status for this to pass.
+        allow read: if uid() == userId
+          || (isFriendOf(userId)
+              && resource.data.status in ['reading', 'paused', 'finished', 'dnf']);
+        allow delete: if uid() == userId;
         // Rating and review live in ratings/, so friends who can read logs
         // later never see them
         allow create, update: if uid() == userId
@@ -37,6 +50,21 @@ service cloud.firestore {
       // whatever friends can read on readingLogs later.
       match /ratings/{readingKey} {
         allow read, write: if uid() == userId;
+      }
+
+      // Started and finished events for the friends feed, id {readId}_{type}.
+      // Written with the status change, deleted when it's undone.
+      match /activity/{activityId} {
+        allow read: if uid() == userId || isFriendOf(userId);
+        allow create, update: if uid() == userId
+          && request.resource.data.keys().hasOnly(
+               ['type', 'readingKey', 'title', 'coverUrl', 'at'])
+          && request.resource.data.type in ['started', 'finished']
+          && activityId.matches('.+_' + request.resource.data.type)
+          && request.resource.data.readingKey is string
+          && request.resource.data.title is string
+          && request.resource.data.at == request.time;
+        allow delete: if uid() == userId;
       }
     }
 
