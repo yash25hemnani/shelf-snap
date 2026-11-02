@@ -31,9 +31,8 @@ class ReadingLogModel {
   final BookStatus status;
   // A copy of the latest read, so screens only need the log; null = no read yet
   final ReadModel? latestRead;
-  // For the book across all its reads
-  final int? rating; // 1–10; null = not rated
-  final String? review; // null = no review
+  // Rating and review live in ratings/ (BookRatingModel), so friends who
+  // can read logs never see them
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -46,8 +45,6 @@ class ReadingLogModel {
     this.pageCount,
     this.status = BookStatus.wantToRead,
     this.latestRead,
-    this.rating,
-    this.review,
     this.createdAt,
     this.updatedAt,
   });
@@ -70,8 +67,6 @@ class ReadingLogModel {
       latestRead: readId == null || readMap == null
           ? null
           : ReadModel.fromMap(readId, readMap),
-      rating: (map['rating'] as num?)?.toInt(),
-      review: map['review'] as String?,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
     );
@@ -88,8 +83,6 @@ class ReadingLogModel {
     // The read's own map has no id, so it's saved next to it
     'latestReadId': latestRead?.id,
     'latestRead': latestRead?.toMap(),
-    'rating': rating,
-    'review': review,
     'createdAt': Timestamp.fromDate(createdAt ?? DateTime.now()),
     'updatedAt': Timestamp.now(),
     // Worked out on every save, so old logs get tokens on their next write
@@ -134,8 +127,6 @@ class ReadingLogModel {
       pageCount: pageCount ?? this.pageCount,
       status: status ?? this.status,
       latestRead: clearLatestRead ? null : (latestRead ?? this.latestRead),
-      rating: rating,
-      review: review,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

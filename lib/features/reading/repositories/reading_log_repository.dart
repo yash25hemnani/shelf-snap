@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/reading/models/book_rating_model.dart';
 import 'package:shelf_snap/features/reading/models/read_date.dart';
 import 'package:shelf_snap/features/reading/models/read_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
@@ -15,6 +16,9 @@ class ReadingLogRepository {
     String readingKey,
   ) => _logs(userId).doc(readingKey).collection('reads');
 
+  CollectionReference<Map<String, dynamic>> _ratings(String userId) =>
+      _db.collection('users').doc(userId).collection('ratings');
+
   // The log for one book, keyed by its readingKey; null when there's none
   Stream<ReadingLogModel?> watchLog(String userId, String readingKey) {
     return _logs(userId)
@@ -23,6 +27,17 @@ class ReadingLogRepository {
         .map(
           (doc) =>
               doc.exists ? ReadingLogModel.fromMap(doc.id, doc.data()!) : null,
+        );
+  }
+
+  // The user's rating and review of one book; null when there's neither
+  Stream<BookRatingModel?> watchRating(String userId, String readingKey) {
+    return _ratings(userId)
+        .doc(readingKey)
+        .snapshots()
+        .map(
+          (doc) =>
+              doc.exists ? BookRatingModel.fromMap(doc.id, doc.data()!) : null,
         );
   }
 
@@ -118,6 +133,8 @@ class ReadingLogRepository {
       batch.delete(doc.reference);
     }
     batch.delete(logRef);
+    // The rating goes too, so re-adding the book starts clean
+    batch.delete(_ratings(userId).doc(readingKey));
 
     await batch.commit();
   }
@@ -463,7 +480,11 @@ class ReadingLogRepository {
       throw ArgumentError('Invalid rating: $rating');
     }
 
-    await _logs(userId).doc(readingKey).update({'rating': rating});
+    // set + merge: the doc may not exist yet, and update would fail
+    await _ratings(userId).doc(readingKey).set({
+      'rating': rating ?? FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   // The book's review; empty or blank removes it
@@ -474,8 +495,9 @@ class ReadingLogRepository {
   ) async {
     final text = review.trim();
 
-    await _logs(
-      userId,
-    ).doc(readingKey).update({'review': text.isEmpty ? null : text});
+    await _ratings(userId).doc(readingKey).set({
+      'review': text.isEmpty ? FieldValue.delete() : text,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 }

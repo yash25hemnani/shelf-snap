@@ -27,6 +27,12 @@ service cloud.firestore {
           allow read, write: if uid() == userId;
         }
       }
+
+      // Rating and review for one book, keyed by readingKey. Owner only,
+      // whatever friends can read on readingLogs later.
+      match /ratings/{readingKey} {
+        allow read, write: if uid() == userId;
+      }
     }
 
     // Reading stats: collectionGroup('reads').where('uid', ==, me)

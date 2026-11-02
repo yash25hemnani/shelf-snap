@@ -253,12 +253,12 @@ class _ReadingLogDetailScreenState
   }
 
   // Clearing the text removes the review
-  Future<void> _editReview(ReadingLogModel log) async {
+  Future<void> _editReview(String? current) async {
     final userId = AuthService().currentUser?.uid;
     if (userId == null) return;
 
-    final text = await showReviewSheet(context, current: log.review);
-    if (text == null || text == (log.review ?? '') || !mounted) return;
+    final text = await showReviewSheet(context, current: current);
+    if (text == null || text == (current ?? '') || !mounted) return;
 
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -307,6 +307,10 @@ class _ReadingLogDetailScreenState
     );
     final logAsync = ref.watch(readingLogProvider(widget.readingKey));
     final reads = ref.watch(readsProvider(widget.readingKey)).valueOrNull;
+    // valueOrNull so the page doesn't wait on it; the cards fill in after
+    final bookRating = ref
+        .watch(bookRatingProvider(widget.readingKey))
+        .valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -381,11 +385,12 @@ class _ReadingLogDetailScreenState
           // Rating opens once the book has been finished or dropped at
           // least once, and stays open after that
           final canRate =
-              log.rating != null ||
-              log.review != null ||
+              bookRating?.rating != null ||
+              bookRating?.review != null ||
               (read != null && !read.isActive) ||
               history.isNotEmpty;
-          final review = log.review;
+          final rating = bookRating?.rating;
+          final review = bookRating?.review;
           final coverUrl = log.coverUrl;
           const placeholder = ColoredBox(
             color: AppColors.surfaceMuted,
@@ -646,13 +651,11 @@ class _ReadingLogDetailScreenState
                           trailing: Padding(
                             padding: const EdgeInsets.only(right: 4),
                             child: SoftPill(
-                              label: log.rating == null
-                                  ? '–/10'
-                                  : '${log.rating}/10',
+                              label: rating == null ? '–/10' : '$rating/10',
                             ),
                           ),
                           child: _RatingRow(
-                            rating: log.rating,
+                            rating: rating,
                             onChanged: _saveRating,
                           ),
                         ),
@@ -661,7 +664,7 @@ class _ReadingLogDetailScreenState
                           icon: Icons.rate_review_outlined,
                           title: 'Review',
                           trailing: TextButton.icon(
-                            onPressed: () => _editReview(log),
+                            onPressed: () => _editReview(review),
                             icon: Icon(
                               review == null
                                   ? Icons.add_rounded

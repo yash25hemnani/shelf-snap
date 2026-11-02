@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/reading/models/book_rating_model.dart';
 import 'package:shelf_snap/features/reading/models/read_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_stats.dart';
@@ -17,6 +18,17 @@ final readingLogProvider = StreamProvider.autoDispose
       return ref
           .watch(readingLogRepositoryProvider)
           .watchLog(userId, readingKey);
+    });
+
+// The current user's rating and review of one book; null when there's none
+final bookRatingProvider = StreamProvider.autoDispose
+    .family<BookRatingModel?, String>((ref, readingKey) {
+      final userId = ref.watch(currentUidProvider).valueOrNull;
+      if (userId == null) return Stream.value(null);
+
+      return ref
+          .watch(readingLogRepositoryProvider)
+          .watchRating(userId, readingKey);
     });
 
 // Every read of one book, latest end date first; empty when signed out
