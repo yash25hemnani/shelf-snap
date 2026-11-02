@@ -110,6 +110,76 @@ class ReadingLogRepository {
         );
   }
 
+  // A friend's reading and paused books, most recently changed first.
+  // Rules only let friends read started and ended logs, so every friend
+  // query must filter on status or Firestore refuses it.
+  Stream<List<ReadingLogModel>> watchFriendCurrentLogs(
+    String friendUid, {
+    int limit = 10,
+  }) {
+    return _logs(friendUid)
+        .where(
+          'status',
+          whereIn: [BookStatus.reading.name, BookStatus.paused.name],
+        )
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => ReadingLogModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  // A friend's finished and DNF books, latest end date first.
+  // Needs a composite index: status + latestRead.endedAt DESC.
+  Stream<List<ReadingLogModel>> watchFriendEndedLogs(
+    String friendUid, {
+    required int limit,
+  }) {
+    return _logs(friendUid)
+        .where(
+          'status',
+          whereIn: [BookStatus.finished.name, BookStatus.dnf.name],
+        )
+        .orderBy('latestRead.endedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => ReadingLogModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  // Books a friend finished in [year] and their pages, worked out by
+  // Firestore without loading the logs (about one read). Counts each
+  // book's latest finish only, since friends can't read the reads.
+  // Needs a composite index: status + latestRead.endedAt ASC.
+  Future<({int finished, int pagesRead})> friendYearStats(
+    String friendUid,
+    int year,
+  ) async {
+    final snap = await _logs(friendUid)
+        .where('status', isEqualTo: BookStatus.finished.name)
+        .where(
+          'latestRead.endedAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(year)),
+        )
+        .where(
+          'latestRead.endedAt',
+          isLessThan: Timestamp.fromDate(DateTime(year + 1)),
+        )
+        .aggregate(count(), sum('pageCount'))
+        .get();
+
+    return (
+      finished: snap.count ?? 0,
+      pagesRead: (snap.getSum('pageCount') ?? 0).round(),
+    );
+  }
+
   Stream<List<ReadModel>> watchReads(String userId, String readingKey) {
     return _reads(userId, readingKey)
         .orderBy('endedAt', descending: true)
