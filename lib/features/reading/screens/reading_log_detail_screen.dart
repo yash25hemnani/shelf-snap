@@ -749,8 +749,8 @@ class _RatingRow extends StatelessWidget {
                 aspectRatio: 1,
                 child: Material(
                   color: n <= rating
-                      ? AppColors.primary
-                      : AppColors.surfaceMuted,
+                      ? AppColors.secondary
+                      : AppColors.secondarySoft,
                   shape: const CircleBorder(),
                   clipBehavior: Clip.antiAlias,
                   child: InkWell(
@@ -760,8 +760,8 @@ class _RatingRow extends StatelessWidget {
                         '$n',
                         style: style?.copyWith(
                           color: n <= rating
-                              ? AppColors.onPrimary
-                              : AppColors.textSecondary,
+                              ? AppColors.onSecondary
+                              : AppColors.secondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

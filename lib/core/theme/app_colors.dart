@@ -8,6 +8,10 @@ class AppColors {
   static const primaryDark = Color(0xFF1F4A36);
   static const primarySoft = Color(0xFFE3EFE8);
   static const onPrimary = Color(0xFFFFFFFF);
+  // Warm book-spine brown for personal touches like ratings, next to the green
+  static const secondary = Color(0xFF7B5B3A);
+  static const secondarySoft = Color(0xFFF3ECE4);
+  static const onSecondary = Color(0xFFFFFFFF);
 
   // Surfaces
   static const background = Color(0xFFFFFFFF);
@@ -39,6 +43,7 @@ class AppColors {
   // Avatar colours as [text, background]; each user always gets the same pair
   static const avatarColors = <List<Color>>[
     [primary, primarySoft],
+    [secondary, secondarySoft],
     [accent, accentSoft],
     [warning, warningSoft],
     [error, errorSoft],

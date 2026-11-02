@@ -12,6 +12,10 @@ class AppTheme {
       onPrimary: AppColors.onPrimary,
       primaryContainer: AppColors.primarySoft,
       onPrimaryContainer: AppColors.primaryDark,
+      // M3 widgets such as NavigationBar use secondaryContainer for the
+      // selected pill, so it stays green to match the rest of the app
+      secondary: AppColors.secondary,
+      onSecondary: AppColors.onSecondary,
       secondaryContainer: AppColors.primarySoft,
       onSecondaryContainer: AppColors.primaryDark,
       surface: AppColors.background,
