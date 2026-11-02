@@ -60,7 +60,6 @@ class _ChooseUsernameScreenState extends ConsumerState<ChooseUsernameScreen> {
               uid: user.uid,
               username: username,
               name: _nameController.text.trim(),
-              email: (user.email ?? '').toLowerCase(),
               avatarSeed: _seeds[_selected],
               createdAt: DateTime.now(),
             ),

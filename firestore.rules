@@ -16,7 +16,9 @@ service cloud.firestore {
     // ---------- Users ----------
     match /users/{userId} {
       allow read: if signedIn();                    // search, member lists
-      allow create, update: if uid() == userId;
+      // Every signed-in user can read this doc, so it must never hold an email
+      allow create: if uid() == userId && !('email' in request.resource.data);
+      allow update: if uid() == userId && !('email' in request.resource.data);
       allow delete: if false;
 
       match /readingLogs/{readingKey} {

@@ -1,10 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+// No email here: user docs are readable by every signed-in user, so the
+// email stays in Firebase Auth only
 class UserModel {
   final String uid;
   final String username; // stored lowercase
   final String name;
-  final String email; // stored lowercase
   final String? photoUrl;
   final String? avatarSeed;
   final DateTime createdAt;
@@ -13,7 +14,6 @@ class UserModel {
     required this.uid,
     required this.username,
     required this.name,
-    required this.email,
     this.photoUrl,
     this.avatarSeed,
     required this.createdAt,
@@ -23,7 +23,6 @@ class UserModel {
   Map<String, dynamic> toMap() => {
     'username': username,
     'name': name,
-    'email': email,
     'photoUrl': photoUrl,
     'avatarSeed': avatarSeed,
     'createdAt': Timestamp.fromDate(createdAt),
@@ -38,7 +37,6 @@ class UserModel {
       username: username,
       // Falls back to the username when no display name is set
       name: (name == null || name.isEmpty) ? username : name,
-      email: map['email'] as String? ?? '',
       photoUrl: map['photoUrl'] as String?,
       avatarSeed: map['avatarSeed'] as String?,
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
