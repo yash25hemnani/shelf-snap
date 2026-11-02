@@ -22,7 +22,12 @@ service cloud.firestore {
       allow delete: if false;
 
       match /readingLogs/{readingKey} {
-        allow read, write: if uid() == userId;
+        allow read, delete: if uid() == userId;
+        // Rating and review live in ratings/, so friends who can read logs
+        // later never see them
+        allow create, update: if uid() == userId
+          && !('rating' in request.resource.data)
+          && !('review' in request.resource.data);
         match /reads/{readId} {
           allow read, write: if uid() == userId;
         }
