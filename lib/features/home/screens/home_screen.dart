@@ -278,13 +278,13 @@ class HomeScreen extends ConsumerWidget {
               ],
             ),
             // Solid strip over the status bar so scrolled content doesn't
-            // run under the clock; same green as the top of the header
+            // run under the clock; white like the top bar on every other page
             Positioned(
               top: 0,
               left: 0,
               right: 0,
               height: MediaQuery.paddingOf(context).top,
-              child: const ColoredBox(color: AppColors.primarySoft),
+              child: const ColoredBox(color: AppColors.background),
             ),
           ],
         ),
@@ -320,13 +320,8 @@ class _Header extends StatelessWidget {
         8,
         24,
       ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.primarySoft, AppColors.background],
-        ),
-      ),
+      // Plain white, like the top bar on every other page
+      color: AppColors.background,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

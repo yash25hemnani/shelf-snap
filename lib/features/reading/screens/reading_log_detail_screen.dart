@@ -29,6 +29,14 @@ class _ReadingLogDetailScreenState
   // The page under the slider while dragging; null shows the saved page
   int? _dragPage;
 
+  // One line under the slider instead of a separate Dates card
+  String _datesLabel(ReadModel read) {
+    final started = 'Started ${read.startedAt?.label ?? 'not set'}';
+    if (read.isActive) return started;
+    final ended = read.status == BookStatus.dnf ? 'stopped' : 'finished';
+    return '$started, $ended ${read.endedAt?.label ?? 'not set'}';
+  }
+
   Future<void> _onStatusChanged(ReadingLogModel log, BookStatus status) async {
     final userId = AuthService().currentUser?.uid;
     if (userId == null || status == log.status) return;
@@ -311,6 +319,7 @@ class _ReadingLogDetailScreenState
     final bookRating = ref
         .watch(bookRatingProvider(widget.readingKey))
         .valueOrNull;
+    final loadedLog = logAsync.valueOrNull;
 
     return Scaffold(
       appBar: AppBar(
@@ -322,6 +331,17 @@ class _ReadingLogDetailScreenState
         actions: [
           PopupMenuButton<void>(
             itemBuilder: (_) => [
+              // Rarely needed, so it lives here rather than on the page;
+              // a missing count has its own card with a button
+              if ((loadedLog?.pageCount ?? 0) > 0)
+                PopupMenuItem(
+                  onTap: () => _editPageCount(loadedLog!),
+                  child: const ListTile(
+                    leading: Icon(Icons.menu_book_outlined),
+                    title: Text('Edit page count'),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
               PopupMenuItem(
                 onTap: _addPreviousRead,
                 child: const ListTile(
@@ -402,9 +422,6 @@ class _ReadingLogDetailScreenState
           final percent = hasPages
               ? (currentPage * 100 / pageCount).round()
               : 0;
-          final small = textTheme.bodySmall?.copyWith(
-            color: AppColors.textSecondary,
-          );
 
           return SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 32),
@@ -443,39 +460,10 @@ class _ReadingLogDetailScreenState
                                   : log.authors.join(', '),
                               style: muted,
                             ),
+                            // Plain text; fixing it is in the ⋮ menu
                             if (hasPages) ...[
                               const SizedBox(height: 4),
-                              // Tap the row to fix a wrong page count
-                              InkWell(
-                                onTap: () => _editPageCount(log),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 4,
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.menu_book_outlined,
-                                        size: 18,
-                                        color: AppColors.textSecondary,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        '${log.pageCount} pages',
-                                        style: muted,
-                                      ),
-                                      const SizedBox(width: 10),
-                                      const Icon(
-                                        Icons.edit_outlined,
-                                        size: 18,
-                                        color: AppColors.primary,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                              Text('${log.pageCount} pages', style: muted),
                             ],
                             const SizedBox(height: 12),
                             StatusDropdown(
@@ -501,29 +489,51 @@ class _ReadingLogDetailScreenState
                       // Want to read has no read, so no progress or dates
                       if (hasPages && read != null) ...[
                         SectionCard(
-                          icon: Icons.bar_chart_rounded,
                           title: 'Progress',
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Only a reading or paused read takes progress
-                              if (read.isActive)
-                                TextButton(
-                                  onPressed: () =>
-                                      _editProgress(currentPage, pageCount),
-                                  child: const Text('Update'),
-                                ),
-                              SoftPill(label: '$percent%'),
-                            ],
-                          ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                read.status == BookStatus.finished
-                                    ? 'Finished · $pageCount pages'
-                                    : 'Page $currentPage of $pageCount',
-                                style: muted,
+                              // The page number is the main thing on the page.
+                              // Tap it to type an exact page, for when
+                              // dragging is too rough; only a reading or
+                              // paused read takes progress.
+                              InkWell(
+                                onTap: read.isActive
+                                    ? () =>
+                                          _editProgress(currentPage, pageCount)
+                                    : null,
+                                borderRadius: BorderRadius.circular(8),
+                                child: Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      '$currentPage',
+                                      style: textTheme.headlineLarge?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text('of $pageCount', style: muted),
+                                    if (read.isActive) ...[
+                                      const SizedBox(width: 6),
+                                      const Icon(
+                                        Icons.edit_outlined,
+                                        size: 16,
+                                        color: AppColors.hint,
+                                      ),
+                                    ],
+                                    const Spacer(),
+                                    Text(
+                                      '$percent%',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                               // Drag to move the page; saved when the finger
                               // lifts. Ended reads show it but can't be dragged.
@@ -544,8 +554,8 @@ class _ReadingLogDetailScreenState
                                   // No side padding, so the track lines up
                                   // with the text above it
                                   padding: const EdgeInsets.only(
-                                    top: 16,
-                                    bottom: 6,
+                                    top: 12,
+                                    bottom: 8,
                                   ),
                                   value: currentPage.toDouble(),
                                   max: pageCount.toDouble(),
@@ -559,12 +569,36 @@ class _ReadingLogDetailScreenState
                                       : null,
                                 ),
                               ),
-                              Row(
-                                children: [
-                                  Text('0', style: small),
-                                  const Spacer(),
-                                  Text('$pageCount', style: small),
-                                ],
+                              // Tap to fix the dates
+                              InkWell(
+                                onTap: () => _editDates(read),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_today_outlined,
+                                        size: 16,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _datesLabel(read),
+                                          style: muted,
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.chevron_right_rounded,
+                                        size: 20,
+                                        color: AppColors.hint,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                               // Saved on the last page but not finished yet.
                               // Uses the saved page, so it waits for the drag
@@ -585,49 +619,6 @@ class _ReadingLogDetailScreenState
                             ],
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        SectionCard(
-                          icon: Icons.calendar_month_outlined,
-                          title: 'Dates',
-                          trailing: TextButton.icon(
-                            onPressed: () => _editDates(read),
-                            icon: const Icon(Icons.edit_outlined, size: 18),
-                            label: const Text('Edit'),
-                          ),
-                          child: Column(
-                            children: [
-                              Row(
-                                children: [
-                                  const Expanded(child: Text('Started')),
-                                  Text(
-                                    read.startedAt?.label ?? 'Not set',
-                                    style: muted,
-                                  ),
-                                ],
-                              ),
-                              // Only an ended read has an end date
-                              if (!read.isActive) ...[
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        read.status == BookStatus.dnf
-                                            ? 'Stopped'
-                                            : 'Finished',
-                                      ),
-                                    ),
-                                    Text(
-                                      read.endedAt?.label ?? 'Not set',
-                                      style: muted,
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-
                         // A new read; this one stays in the history
                         if (!read.isActive) ...[
                           const SizedBox(height: 16),
@@ -646,10 +637,9 @@ class _ReadingLogDetailScreenState
                       if (canRate) ...[
                         const SizedBox(height: 16),
                         SectionCard(
-                          icon: Icons.star_outline_rounded,
                           title: 'Rating',
                           trailing: Padding(
-                            padding: const EdgeInsets.only(right: 4),
+                            padding: const EdgeInsets.only(right: 8),
                             child: SoftPill(
                               label: rating == null ? '–/10' : '$rating/10',
                             ),
@@ -661,17 +651,11 @@ class _ReadingLogDetailScreenState
                         ),
                         const SizedBox(height: 12),
                         SectionCard(
-                          icon: Icons.rate_review_outlined,
                           title: 'Review',
-                          trailing: TextButton.icon(
+                          // Text-only, like every card action on this page
+                          trailing: TextButton(
                             onPressed: () => _editReview(review),
-                            icon: Icon(
-                              review == null
-                                  ? Icons.add_rounded
-                                  : Icons.edit_outlined,
-                              size: 18,
-                            ),
-                            label: Text(review == null ? 'Add' : 'Edit'),
+                            child: Text(review == null ? 'Add' : 'Edit'),
                           ),
                           child: review == null
                               ? Text('No review yet', style: muted)
@@ -679,40 +663,29 @@ class _ReadingLogDetailScreenState
                         ),
                       ],
 
-                      if (hasPages) ...[
+                      // Hidden until there's a past read; the first one is
+                      // added from the ⋮ menu
+                      if (hasPages && history.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         SectionCard(
-                          icon: Icons.shelves,
                           title: 'History',
-                          trailing: TextButton.icon(
+                          trailing: TextButton(
                             onPressed: _addPreviousRead,
-                            icon: const Icon(Icons.add_rounded, size: 20),
-                            label: const Text('Add'),
+                            child: const Text('Add'),
                           ),
-                          child: history.isEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 16,
-                                  ),
-                                  child: Text(
-                                    'No past reads',
-                                    textAlign: TextAlign.center,
-                                    style: muted,
-                                  ),
-                                )
-                              : Column(
-                                  children: [
-                                    for (final past in history) ...[
-                                      _HistoryCard(
-                                        read: past,
-                                        onEdit: () => _editPastRead(past),
-                                        onDelete: () => _deletePastRead(past),
-                                      ),
-                                      if (past != history.last)
-                                        const SizedBox(height: 8),
-                                    ],
-                                  ],
+                          child: Column(
+                            children: [
+                              for (final past in history) ...[
+                                _HistoryCard(
+                                  read: past,
+                                  onEdit: () => _editPastRead(past),
+                                  onDelete: () => _deletePastRead(past),
                                 ),
+                                if (past != history.last)
+                                  const SizedBox(height: 8),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
                     ],
