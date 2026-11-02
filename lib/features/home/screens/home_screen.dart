@@ -186,8 +186,7 @@ class HomeScreen extends ConsumerWidget {
                           // Lets the cards scroll to the screen edge
                           clipBehavior: Clip.none,
                           itemCount: inProgress.length - 1,
-                          separatorBuilder: (_, _) =>
-                              const SizedBox(width: 12),
+                          separatorBuilder: (_, _) => const SizedBox(width: 12),
                           itemBuilder: (_, i) {
                             final log = inProgress[i + 1];
                             return _ContinueCard(log: log, onTap: open(log));
@@ -454,99 +453,82 @@ class _StatsCard extends StatelessWidget {
     final most = counts.fold<int>(0, (a, b) => a > b ? a : b);
     final currentMonth = DateTime.now().month;
 
-    // Solid blue, the Stats colour on Profile, with the same faded icon
+    // Solid blue, the Stats colour on Profile
     return Material(
       color: AppColors.accent,
-      clipBehavior: Clip.antiAlias, // clips the watermark and the ripple
+      clipBehavior: Clip.antiAlias, // keeps the ripple inside the corners
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         onTap: onTap,
-        child: Stack(
-          children: [
-            Positioned(
-              right: -20,
-              bottom: -24,
-              child: Icon(
-                Icons.insights_rounded,
-                size: 128,
-                color: AppColors.onPrimary.withValues(alpha: 0.14),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          'Your $year',
-                          style: textTheme.titleMedium?.copyWith(
-                            color: AppColors.onPrimary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      // Not a button: the whole card already opens stats
-                      const Icon(
-                        Icons.chevron_right_rounded,
+                  Expanded(
+                    child: Text(
+                      'Your $year',
+                      style: textTheme.titleMedium?.copyWith(
                         color: AppColors.onPrimary,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      _BigNumber(
-                        value: '${stats.finished}',
-                        label: 'books finished',
-                      ),
-                      _BigNumber(
-                        value: _thousands(stats.pagesRead),
-                        label: 'pages read',
-                      ),
-                      _BigNumber(value: '$readingNow', label: 'reading now'),
-                    ],
-                  ),
-                  // Month bars only once a book is finished
-                  if (stats.finished > 0) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 32,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          for (var i = 0; i < 12; i++)
-                            Expanded(
-                              child: Container(
-                                height: counts[i] == 0
-                                    ? 3
-                                    : 32 * counts[i] / most,
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  // This month is solid white, the rest faded
-                                  color: AppColors.onPrimary.withValues(
-                                    alpha: counts[i] == 0
-                                        ? 0.25
-                                        : i + 1 == currentMonth
-                                        ? 1
-                                        : 0.7,
-                                  ),
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                            ),
-                        ],
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
-                  ],
+                  ),
+                  // Not a button: the whole card already opens stats
+                  const Icon(
+                    Icons.chevron_right_rounded,
+                    color: AppColors.onPrimary,
+                  ),
                 ],
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _BigNumber(
+                    value: '${stats.finished}',
+                    label: 'books finished',
+                  ),
+                  _BigNumber(
+                    value: _thousands(stats.pagesRead),
+                    label: 'pages read',
+                  ),
+                  _BigNumber(value: '$readingNow', label: 'reading now'),
+                ],
+              ),
+              // Month bars only once a book is finished
+              if (stats.finished > 0) ...[
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 32,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      for (var i = 0; i < 12; i++)
+                        Expanded(
+                          child: Container(
+                            height: counts[i] == 0 ? 3 : 32 * counts[i] / most,
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            decoration: BoxDecoration(
+                              // This month is solid white, the rest faded
+                              color: AppColors.onPrimary.withValues(
+                                alpha: counts[i] == 0
+                                    ? 0.25
+                                    : i + 1 == currentMonth
+                                    ? 1
+                                    : 0.7,
+                              ),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -714,9 +696,7 @@ class _HeroReadingCard extends StatelessWidget {
                         visualDensity: VisualDensity.compact,
                       ),
                       icon: Icon(
-                        hasPages
-                            ? Icons.edit_note_rounded
-                            : Icons.add_rounded,
+                        hasPages ? Icons.edit_note_rounded : Icons.add_rounded,
                         size: 18,
                       ),
                       label: Text(hasPages ? 'Update page' : 'Add page count'),
@@ -1009,9 +989,9 @@ class _NewLibraryTile extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 'New library',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  color: AppColors.primaryDark,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(color: AppColors.primaryDark),
               ),
             ],
           ),
