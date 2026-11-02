@@ -6,6 +6,8 @@ import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/friends/providers/friendship_provider.dart';
+import 'package:shelf_snap/features/friends/screens/friends_screen.dart';
 import 'package:shelf_snap/features/lending/models/loan_model.dart';
 import 'package:shelf_snap/features/lending/providers/loan_provider.dart';
 import 'package:shelf_snap/features/lending/screens/loans_screen.dart';
@@ -56,6 +58,11 @@ class ProfileScreen extends ConsumerWidget {
             ?.where((l) => l.status == LoanStatus.requested)
             .length ??
         0;
+
+    // Both come from the one friendships listener, so no extra reads
+    final friendCount = ref.watch(friendsProvider).valueOrNull?.length;
+    final incomingCount =
+        ref.watch(incomingRequestsProvider).valueOrNull?.length ?? 0;
 
     return Scaffold(
       appBar: AppBar(
@@ -122,8 +129,7 @@ class ProfileScreen extends ConsumerWidget {
                 label: 'Books',
               ),
               const SizedBox(width: 8),
-              // Shows "–" until friends exist
-              const _Stat(label: 'Friends'),
+              _Stat(value: friendCount, label: 'Friends'),
             ],
           ),
           const SizedBox(height: 24),
@@ -159,13 +165,17 @@ class ProfileScreen extends ConsumerWidget {
           _MenuRow(
             icon: Icons.people_outline_rounded,
             label: 'Friends',
-            comingSoon: true,
-            onTap: () => _comingSoon(context),
+            badge: incomingCount,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FriendsScreen()),
+            ),
           ),
           const SizedBox(height: 8),
           _MenuRow(
             icon: Icons.settings_outlined,
             label: 'Settings',
+            comingSoon: true,
             onTap: () => _comingSoon(context),
           ),
           const SizedBox(height: 16),
