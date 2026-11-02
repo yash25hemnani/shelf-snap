@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
+import 'package:shelf_snap/core/utils/date_format.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
+import 'package:shelf_snap/features/reading/models/read_date.dart';
 import 'package:shelf_snap/features/reading/models/read_model.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
@@ -35,6 +37,35 @@ class _ReadingLogDetailScreenState
     if (read.isActive) return started;
     final ended = read.status == BookStatus.dnf ? 'stopped' : 'finished';
     return '$started, $ended ${read.endedAt?.label ?? 'not set'}';
+  }
+
+  // Days so far, pages a day and an estimated finish date. Needs a full
+  // start date, since a month or a year alone can't give a day count.
+  ({int days, int perDay, DateTime? finishBy})? _pace(
+    ReadModel read,
+    int page,
+    int pageCount,
+  ) {
+    final start = read.startedAt;
+    if (start == null || start.precision != DatePrecision.day) return null;
+
+    // UTC dates, so a clock change can't cut a day short
+    final now = DateTime.now();
+    final today = DateTime.utc(now.year, now.month, now.day);
+    final startDay = DateTime.utc(start.year, start.month!, start.day!);
+    // The start day counts as day one
+    final days = today.difference(startDay).inDays + 1;
+    if (days < 1) return null;
+
+    final rate = page / days;
+    final finishBy = rate > 0
+        ? DateTime(
+            now.year,
+            now.month,
+            now.day + ((pageCount - page) / rate).ceil(),
+          )
+        : null;
+    return (days: days, perDay: rate.round(), finishBy: finishBy);
   }
 
   Future<void> _onStatusChanged(ReadingLogModel log, BookStatus status) async {
@@ -422,6 +453,9 @@ class _ReadingLogDetailScreenState
           final percent = hasPages
               ? (currentPage * 100 / pageCount).round()
               : 0;
+          final pace = read != null && hasPages
+              ? _pace(read, currentPage, pageCount)
+              : null;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.only(bottom: 32),
@@ -460,10 +494,20 @@ class _ReadingLogDetailScreenState
                                   : log.authors.join(', '),
                               style: muted,
                             ),
-                            // Plain text; fixing it is in the ⋮ menu
+                            // A small link, so fixing a wrong count is easy
+                            // to find but doesn't compete with the status
                             if (hasPages) ...[
                               const SizedBox(height: 4),
-                              Text('${log.pageCount} pages', style: muted),
+                              Row(
+                                children: [
+                                  Text('${log.pageCount} pages', style: muted),
+                                  const SizedBox(width: 8),
+                                  _InlineLink(
+                                    label: 'Edit',
+                                    onTap: () => _editPageCount(log),
+                                  ),
+                                ],
+                              ),
                             ],
                             const SizedBox(height: 12),
                             StatusDropdown(
@@ -493,81 +537,115 @@ class _ReadingLogDetailScreenState
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              // The page number is the main thing on the page.
-                              // Tap it to type an exact page, for when
-                              // dragging is too rough; only a reading or
-                              // paused read takes progress.
-                              InkWell(
-                                onTap: read.isActive
-                                    ? () =>
-                                          _editProgress(currentPage, pageCount)
-                                    : null,
-                                borderRadius: BorderRadius.circular(8),
-                                child: Row(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    Text(
-                                      '$currentPage',
-                                      style: textTheme.headlineLarge?.copyWith(
-                                        fontWeight: FontWeight.w700,
+                              Text('Current page', style: muted),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  // The page number is the main thing on the
+                                  // page. The soft box makes it read as a
+                                  // field; tap it to type an exact page.
+                                  // Only a reading or paused read takes
+                                  // progress.
+                                  Material(
+                                    color: read.isActive
+                                        ? AppColors.primarySoft
+                                        : AppColors.surfaceMuted,
+                                    borderRadius: BorderRadius.circular(12),
+                                    clipBehavior: Clip.antiAlias,
+                                    child: InkWell(
+                                      onTap: read.isActive
+                                          ? () => _editProgress(
+                                              currentPage,
+                                              pageCount,
+                                            )
+                                          : null,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 6,
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.baseline,
+                                          textBaseline: TextBaseline.alphabetic,
+                                          children: [
+                                            Text(
+                                              '$currentPage',
+                                              style: textTheme.headlineLarge
+                                                  ?.copyWith(
+                                                    fontWeight: FontWeight.w700,
+                                                    color:
+                                                        AppColors.primaryDark,
+                                                  ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text('of $pageCount', style: muted),
+                                          ],
+                                        ),
                                       ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    Text('of $pageCount', style: muted),
-                                    if (read.isActive) ...[
-                                      const SizedBox(width: 6),
-                                      const Icon(
-                                        Icons.edit_outlined,
-                                        size: 16,
-                                        color: AppColors.hint,
-                                      ),
-                                    ],
-                                    const Spacer(),
-                                    Text(
-                                      '$percent%',
-                                      style: textTheme.titleMedium?.copyWith(
-                                        color: AppColors.primary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                  ),
+                                  const Spacer(),
+                                  // Spelled out, so a new user sees how to
+                                  // change the page without guessing
+                                  if (read.isActive)
+                                    FilledButton.tonal(
+                                      onPressed: () =>
+                                          _editProgress(currentPage, pageCount),
+                                      child: const Text('Update'),
                                     ),
-                                  ],
-                                ),
+                                ],
                               ),
                               // Drag to move the page; saved when the finger
                               // lifts. Ended reads show it but can't be dragged.
-                              SliderTheme(
-                                data: SliderTheme.of(context).copyWith(
-                                  trackHeight: 6,
-                                  activeTrackColor: AppColors.primary,
-                                  inactiveTrackColor: AppColors.border,
-                                  thumbColor: AppColors.primary,
-                                  disabledActiveTrackColor: AppColors.primary,
-                                  disabledInactiveTrackColor: AppColors.border,
-                                  disabledThumbColor: AppColors.primary,
-                                  overlayShape: const RoundSliderOverlayShape(
-                                    overlayRadius: 16,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: SliderTheme(
+                                      data: SliderTheme.of(context).copyWith(
+                                        trackHeight: 6,
+                                        activeTrackColor: AppColors.primary,
+                                        inactiveTrackColor: AppColors.border,
+                                        thumbColor: AppColors.primary,
+                                        disabledActiveTrackColor:
+                                            AppColors.primary,
+                                        disabledInactiveTrackColor:
+                                            AppColors.border,
+                                        disabledThumbColor: AppColors.primary,
+                                        overlayShape:
+                                            const RoundSliderOverlayShape(
+                                              overlayRadius: 16,
+                                            ),
+                                      ),
+                                      child: Slider(
+                                        // No side padding, so the track lines up
+                                        // with the text above it
+                                        padding: const EdgeInsets.only(
+                                          top: 12,
+                                          bottom: 8,
+                                        ),
+                                        value: currentPage.toDouble(),
+                                        max: pageCount.toDouble(),
+                                        onChanged: read.isActive
+                                            ? (v) => setState(
+                                                () => _dragPage = v.round(),
+                                              )
+                                            : null,
+                                        onChangeEnd: read.isActive
+                                            ? (v) => _saveProgress(v.round())
+                                            : null,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                child: Slider(
-                                  // No side padding, so the track lines up
-                                  // with the text above it
-                                  padding: const EdgeInsets.only(
-                                    top: 12,
-                                    bottom: 8,
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    '$percent%',
+                                    style: textTheme.titleMedium?.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                  value: currentPage.toDouble(),
-                                  max: pageCount.toDouble(),
-                                  onChanged: read.isActive
-                                      ? (v) => setState(
-                                          () => _dragPage = v.round(),
-                                        )
-                                      : null,
-                                  onChangeEnd: read.isActive
-                                      ? (v) => _saveProgress(v.round())
-                                      : null,
-                                ),
+                                ],
                               ),
                               // Tap to fix the dates
                               InkWell(
@@ -591,10 +669,14 @@ class _ReadingLogDetailScreenState
                                           style: muted,
                                         ),
                                       ),
-                                      const Icon(
-                                        Icons.chevron_right_rounded,
-                                        size: 20,
-                                        color: AppColors.hint,
+                                      // A word, not a chevron, so it's clear
+                                      // the dates can be changed
+                                      Text(
+                                        'Edit',
+                                        style: textTheme.labelLarge?.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -619,6 +701,39 @@ class _ReadingLogDetailScreenState
                             ],
                           ),
                         ),
+                        // Worked out from the start date and the page, so
+                        // they cost no extra reads; they follow the drag
+                        if (read.isActive && pace != null) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _StatTile(
+                                  value: '${pace.days}',
+                                  label: pace.days == 1
+                                      ? 'day reading'
+                                      : 'days reading',
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatTile(
+                                  value: '${pace.perDay}',
+                                  label: 'pages a day',
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: _StatTile(
+                                  value: pace.finishBy == null
+                                      ? '–'
+                                      : dayMonth(pace.finishBy!),
+                                  label: 'finish by',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         // A new read; this one stays in the history
                         if (!read.isActive) ...[
                           const SizedBox(height: 16),
@@ -663,8 +778,27 @@ class _ReadingLogDetailScreenState
                         ),
                       ],
 
-                      // Hidden until there's a past read; the first one is
-                      // added from the ⋮ menu
+                      // Says the feature exists before it unlocks
+                      if (!canRate && read != null) ...[
+                        const SizedBox(height: 16),
+                        Text('Rate and review when you finish.', style: muted),
+                      ],
+
+                      // One line until there's a past read, so it's easy to
+                      // find without an empty card
+                      if (hasPages && history.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Text('Read this before?', style: muted),
+                            TextButton(
+                              onPressed: _addPreviousRead,
+                              child: const Text('Add a past read'),
+                            ),
+                          ],
+                        ),
+                      ],
+
                       if (hasPages && history.isNotEmpty) ...[
                         const SizedBox(height: 16),
                         SectionCard(
@@ -748,6 +882,72 @@ class _RatingRow extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+// One reading-pace fact under the Progress card: a value over a label
+class _StatTile extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _StatTile({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// A small green word that sits inline with text, without a button's padding
+class _InlineLink extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+
+  const _InlineLink({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: AppColors.primary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ),
     );
   }
 }
