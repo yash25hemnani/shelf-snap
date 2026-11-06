@@ -105,9 +105,16 @@ class FriendScreen extends ConsumerWidget {
             style: theme.textTheme.titleLarge,
           ),
           Text(
-            '@$username · Friends since ${dayMonth(since)}',
+            '@$username',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          Text(
+            'Friends since ${dayMonth(since)}',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.labelSmall?.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
@@ -138,24 +145,42 @@ class _Heading extends StatelessWidget {
   }
 }
 
-// Grey one-line text for empty and failed sections
+// White bordered card with an icon and a short line, for empty, loading
+// and failed sections, so they hold their space like the book tiles do
 class _Note extends StatelessWidget {
+  final IconData icon;
   final String text;
 
-  const _Note(this.text);
+  const _Note(this.text, {this.icon = Icons.menu_book_outlined});
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: Theme.of(
-        context,
-      ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// Books finished this year and pages read, side by side
+// This year's numbers in one card, laid out like the stats on Profile
 class _YearStats extends ConsumerWidget {
   final String friendUid;
 
@@ -163,71 +188,53 @@ class _YearStats extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stats = ref.watch(friendYearStatsProvider(friendUid));
-    // Dashes while loading or when it failed, so the layout doesn't jump
-    final finished = stats.valueOrNull?.finished;
-    final pages = stats.valueOrNull?.pagesRead;
+    final theme = Theme.of(context);
+    final stats = ref.watch(friendYearStatsProvider(friendUid)).valueOrNull;
+    // Same listener the Currently reading section uses, so no extra reads
+    final reading = ref
+        .watch(friendCurrentLogsProvider(friendUid))
+        .valueOrNull
+        ?.length;
     final year = DateTime.now().year;
 
-    return Row(
-      children: [
-        _StatBox(
-          icon: Icons.check_circle_outline_rounded,
-          value: finished == null ? '–' : '$finished',
-          label: 'finished in $year',
-        ),
-        const SizedBox(width: 8),
-        _StatBox(
-          icon: Icons.description_outlined,
-          value: pages == null ? '–' : '$pages',
-          label: 'pages read',
-        ),
-      ],
+    // Dashes while loading or when it failed, so the layout doesn't jump
+    Widget stat(int? value, String label) => Expanded(
+      child: Column(
+        children: [
+          Text(value?.toString() ?? '–', style: theme.textTheme.titleLarge),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
-  }
-}
 
-// One number in a bordered card, half the row wide
-class _StatBox extends StatelessWidget {
-  final IconData icon;
-  final String value;
-  final String label;
+    const divider = VerticalDivider(
+      width: 1,
+      indent: 4,
+      endIndent: 4,
+      color: AppColors.border,
+    );
 
-  const _StatBox({
-    required this.icon,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      // Lets the dividers stretch to the height of the numbers
+      child: IntrinsicHeight(
+        child: Row(
           children: [
-            Icon(icon, size: 20, color: AppColors.primary),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: textTheme.headlineSmall?.copyWith(
-                color: AppColors.primaryDark,
-              ),
-            ),
-            Text(
-              label,
-              style: textTheme.labelSmall?.copyWith(
-                color: AppColors.textSecondary,
-              ),
-            ),
+            stat(reading, 'Reading'),
+            divider,
+            stat(stats?.finished, 'Finished in $year'),
+            divider,
+            stat(stats?.pagesRead, 'Pages in $year'),
           ],
         ),
       ),
@@ -253,7 +260,9 @@ class _CurrentSection extends ConsumerWidget {
           loading: () => const [_Note('Loading…')],
           error: (e, _) {
             debugPrint('friend current logs failed: $e');
-            return const [_Note("Couldn't load their reading")];
+            return const [
+              _Note("Couldn't load their reading", icon: Icons.cloud_off),
+            ];
           },
           data: (list) => list.isEmpty
               ? const [_Note('Not reading anything right now')]
@@ -295,10 +304,17 @@ class _EndedSection extends ConsumerWidget {
           loading: () => const [_Note('Loading…')],
           error: (e, _) {
             debugPrint('friend ended logs failed: $e');
-            return const [_Note("Couldn't load their finished books")];
+            return const [
+              _Note("Couldn't load their finished books", icon: Icons.cloud_off),
+            ];
           },
           data: (list) => list.isEmpty
-              ? const [_Note('No finished books yet')]
+              ? const [
+                  _Note(
+                    'No finished books yet',
+                    icon: Icons.check_circle_outline_rounded,
+                  ),
+                ]
               : [
                   for (final log in list) ...[
                     ReadingLogTile(log: log),

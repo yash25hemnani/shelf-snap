@@ -167,13 +167,22 @@ class ProfileScreen extends ConsumerWidget {
           // Settings stays hidden until it exists; a "Coming soon" row
           // made the app look unfinished
           _Card(
-            child: ListTile(
+            child: InkWell(
               onTap: () => _confirmSignOut(context),
-              leading: const Icon(Icons.logout_rounded, color: AppColors.error),
-              title: Text(
-                'Sign out',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: AppColors.error,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.logout_rounded, color: AppColors.error),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Sign out',
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

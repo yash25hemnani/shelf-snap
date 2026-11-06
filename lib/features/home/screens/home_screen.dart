@@ -996,7 +996,7 @@ class _LibraryTile extends StatelessWidget {
   }
 }
 
-// Always last in the library row: a soft green card that opens
+// Always last in the library row: a white bordered card that opens
 // Create library
 class _NewLibraryTile extends StatelessWidget {
   final VoidCallback onTap;
@@ -1008,9 +1008,12 @@ class _NewLibraryTile extends StatelessWidget {
     return SizedBox(
       width: 140,
       child: Material(
-        color: AppColors.primarySoft,
+        color: AppColors.background,
         clipBehavior: Clip.antiAlias,
-        borderRadius: BorderRadius.circular(16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppColors.border),
+        ),
         child: InkWell(
           onTap: onTap,
           child: Column(
@@ -1020,7 +1023,7 @@ class _NewLibraryTile extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: const BoxDecoration(
-                  color: AppColors.background,
+                  color: AppColors.surfaceMuted,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(

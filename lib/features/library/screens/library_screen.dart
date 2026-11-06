@@ -152,7 +152,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 }
 
 // Last row of the list, in place of a floating + that sat on top of the
-// Scan button: a soft green card with the same margins as a library card
+// Scan button: a white bordered card with the same margins as a library card
 class _NewLibraryRow extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -163,9 +163,12 @@ class _NewLibraryRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Material(
-        color: AppColors.primarySoft,
+        color: AppColors.background,
         clipBehavior: Clip.antiAlias,
-        borderRadius: BorderRadius.circular(20),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border),
+        ),
         child: InkWell(
           onTap: onTap,
           child: Padding(
@@ -177,7 +180,7 @@ class _NewLibraryRow extends StatelessWidget {
                   width: 76,
                   height: 76,
                   decoration: BoxDecoration(
-                    color: AppColors.background,
+                    color: AppColors.surfaceMuted,
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: const Icon(
