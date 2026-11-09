@@ -4,6 +4,7 @@ import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/discover/screens/discovered_screen.dart';
 import 'package:shelf_snap/features/friends/providers/friendship_provider.dart';
 import 'package:shelf_snap/features/friends/screens/friends_screen.dart';
 import 'package:shelf_snap/features/lending/models/loan_model.dart';
@@ -161,6 +162,26 @@ class ProfileScreen extends ConsumerWidget {
                 onTap: () => _push(context, const FriendsScreen()),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          // Discover scans are saved here; without this row they were only
+          // reachable from the scanner
+          _Card(
+            child: ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              leading: const Icon(
+                Icons.collections_bookmark_outlined,
+                color: AppColors.primary,
+              ),
+              title: const Text('Discovered'),
+              subtitle: const Text('Books you spotted with Discover'),
+              trailing: const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.hint,
+              ),
+              onTap: () => _push(context, const DiscoveredScreen()),
+            ),
           ),
           const SizedBox(height: 16),
 
