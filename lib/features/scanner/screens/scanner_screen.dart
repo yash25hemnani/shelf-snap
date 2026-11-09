@@ -271,7 +271,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
   void _showResults() {
     if (_mode == ScanMode.discover) {
-      DiscoverResultsSheet.show(context, books: _found);
+      DiscoverResultsSheet.show(
+        context,
+        books: _found,
+        onRemoved: (book) {
+          if (!mounted) return;
+          setState(() {
+            _found = _found.where((b) => b.id != book.id).toList();
+          });
+        },
+      );
       return;
     }
     showModalBottomSheet(

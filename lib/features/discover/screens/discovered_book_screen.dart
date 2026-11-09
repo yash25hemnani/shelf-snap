@@ -33,6 +33,38 @@ class DiscoveredBookScreen extends ConsumerStatefulWidget {
     this.initial,
   });
 
+  // Asks first, then deletes without waiting so it works offline. True when
+  // the delete was started, which lets a swiped row slide away.
+  static Future<bool> confirmRemove(
+    BuildContext context,
+    WidgetRef ref,
+    DiscoveredBookModel item,
+  ) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: 'Remove this book?',
+      message: '${item.book.title} will be removed from Discovered.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    );
+    final userId = ref.read(currentUidProvider).valueOrNull;
+    if (!confirmed || userId == null || !context.mounted) return false;
+
+    final messenger = ScaffoldMessenger.of(context);
+    unawaited(
+      ref
+          .read(discoverRepositoryProvider)
+          .deleteBook(userId, item.id)
+          .catchError((Object e) {
+            debugPrint('deleteBook failed: $e');
+            messenger.showError("Couldn't remove this book");
+          }),
+    );
+    messenger.showMessage('Removed ${item.book.title}');
+    return true;
+  }
+
   @override
   ConsumerState<DiscoveredBookScreen> createState() =>
       _DiscoveredBookScreenState();
@@ -61,30 +93,12 @@ class _DiscoveredBookScreenState extends ConsumerState<DiscoveredBookScreen> {
   }
 
   Future<void> _remove(DiscoveredBookModel item) async {
-    final confirmed = await showConfirmDialog(
+    final removed = await DiscoveredBookScreen.confirmRemove(
       context,
-      icon: Icons.delete_outline_rounded,
-      title: 'Remove this book?',
-      message: '${item.book.title} will be removed from Discovered.',
-      confirmLabel: 'Remove',
-      destructive: true,
+      ref,
+      item,
     );
-    final userId = ref.read(currentUidProvider).valueOrNull;
-    if (!confirmed || userId == null || !mounted) return;
-
-    final messenger = ScaffoldMessenger.of(context);
-    // Not awaited, so it works offline; the page closes straight away
-    unawaited(
-      ref
-          .read(discoverRepositoryProvider)
-          .deleteBook(userId, item.id)
-          .catchError((Object e) {
-            debugPrint('deleteBook failed: $e');
-            messenger.showError("Couldn't remove this book");
-          }),
-    );
-    messenger.showMessage('Removed ${item.book.title}');
-    Navigator.pop(context);
+    if (removed && mounted) Navigator.pop(context);
   }
 
   @override

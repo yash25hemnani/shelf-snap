@@ -14,12 +14,16 @@ class DiscoveredBookTile extends StatelessWidget {
   final DiscoveredBookModel item;
   final TasteMatch? match;
   final VoidCallback onTap;
+  // When set, swiping left removes the book. Resolves true when the book
+  // was removed, so the row slides away; false snaps it back.
+  final Future<bool> Function()? onRemove;
 
   const DiscoveredBookTile({
     super.key,
     required this.item,
     this.match,
     required this.onTap,
+    this.onRemove,
   });
 
   // "Jaipur Book Fair, 3 Nov"; parts are left out when unknown
@@ -44,7 +48,7 @@ class DiscoveredBookTile extends StatelessWidget {
       ),
     );
 
-    return InkWell(
+    final tile = InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -113,6 +117,27 @@ class DiscoveredBookTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+
+    final onRemove = this.onRemove;
+    if (onRemove == null) return tile;
+
+    // The parent must drop the book from its list once this resolves true,
+    // or Flutter complains that a dismissed row is still in the tree
+    return Dismissible(
+      key: ValueKey(item.id),
+      direction: DismissDirection.endToStart,
+      confirmDismiss: (_) => onRemove(),
+      background: Container(
+        color: AppColors.error,
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: AppColors.onPrimary,
+        ),
+      ),
+      child: tile,
     );
   }
 }

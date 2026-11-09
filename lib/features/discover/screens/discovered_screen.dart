@@ -132,6 +132,8 @@ class DiscoveredScreen extends ConsumerWidget {
                   books: books,
                   settings: settings,
                   onOpen: (item) => _open(context, item),
+                  onRemove: (item) =>
+                      DiscoveredBookScreen.confirmRemove(context, ref, item),
                   onPickGenres: () =>
                       showDiscoverGenresSheet(context, ref, settings),
                 );
@@ -163,14 +165,26 @@ class _BookList extends StatelessWidget {
   final List<DiscoveredBookModel> books;
   final DiscoverSettingsModel settings;
   final ValueChanged<DiscoveredBookModel> onOpen;
+  final Future<bool> Function(DiscoveredBookModel) onRemove;
   final VoidCallback onPickGenres;
 
   const _BookList({
     required this.books,
     required this.settings,
     required this.onOpen,
+    required this.onRemove,
     required this.onPickGenres,
   });
+
+  // Firestore drops a deleted book from the stream straight away, even
+  // offline, so the swiped row leaves the list as Dismissible needs
+  Widget _tile(DiscoveredBookModel item) {
+    return DiscoveredBookTile(
+      item: item,
+      onTap: () => onOpen(item),
+      onRemove: () => onRemove(item),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -181,8 +195,7 @@ class _BookList extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           _PickGenresCard(onTap: onPickGenres),
-          for (final item in books)
-            DiscoveredBookTile(item: item, onTap: () => onOpen(item)),
+          for (final item in books) _tile(item),
         ],
       );
     }
@@ -218,8 +231,7 @@ class _BookList extends StatelessWidget {
               ),
             ),
             // The group heading already says the match
-            for (final item in items)
-              DiscoveredBookTile(item: item, onTap: () => onOpen(item)),
+            for (final item in items) _tile(item),
           ],
       ],
     );

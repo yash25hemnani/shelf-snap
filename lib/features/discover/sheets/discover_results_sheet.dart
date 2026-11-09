@@ -10,29 +10,67 @@ import 'package:shelf_snap/features/discover/screens/discovered_screen.dart';
 import 'package:shelf_snap/features/discover/widgets/discovered_book_tile.dart';
 
 // The books found since the scanner opened, best match first. They're
-// already saved to Discovered, so there's no Save button here.
-class DiscoverResultsSheet extends ConsumerWidget {
+// already saved to Discovered, so there's no Save button here; a wrong
+// spot is swiped away instead.
+class DiscoverResultsSheet extends ConsumerStatefulWidget {
   final List<DiscoveredBookModel> books;
+  // Lets the scanner drop the book from its own list too, so it doesn't
+  // come back when the sheet is reopened
+  final ValueChanged<DiscoveredBookModel> onRemoved;
 
-  const DiscoverResultsSheet({super.key, required this.books});
+  const DiscoverResultsSheet({
+    super.key,
+    required this.books,
+    required this.onRemoved,
+  });
 
   static Future<void> show(
     BuildContext context, {
     required List<DiscoveredBookModel> books,
+    required ValueChanged<DiscoveredBookModel> onRemoved,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => DiscoverResultsSheet(books: books),
+      builder: (_) => DiscoverResultsSheet(books: books, onRemoved: onRemoved),
     );
   }
 
-  void _push(BuildContext context, Widget screen) {
+  @override
+  ConsumerState<DiscoverResultsSheet> createState() =>
+      _DiscoverResultsSheetState();
+}
+
+class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
+  late List<DiscoveredBookModel> _books = widget.books;
+
+  void _push(Widget screen) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
   }
 
+  // Dismissible needs the row gone from the list once it slides away
+  Future<bool> _remove(DiscoveredBookModel item) async {
+    final removed = await DiscoveredBookScreen.confirmRemove(
+      context,
+      ref,
+      item,
+    );
+    if (!removed) return false;
+
+    widget.onRemoved(item);
+    if (!mounted) return true;
+    final left = _books.where((b) => b.id != item.id).toList();
+    if (left.isEmpty) {
+      Navigator.pop(context);
+    } else {
+      setState(() => _books = left);
+    }
+    return true;
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final books = _books;
     final textTheme = Theme.of(context).textTheme;
     final taste =
         (ref.watch(discoverSettingsProvider).valueOrNull ??
@@ -80,7 +118,7 @@ class DiscoverResultsSheet extends ConsumerWidget {
                     ),
                   ),
                   TextButton(
-                    onPressed: () => _push(context, const DiscoveredScreen()),
+                    onPressed: () => _push(const DiscoveredScreen()),
                     child: const Text('See all'),
                   ),
                 ],
@@ -96,12 +134,9 @@ class DiscoverResultsSheet extends ConsumerWidget {
                       item: item,
                       match: match,
                       onTap: () => _push(
-                        context,
-                        DiscoveredBookScreen(
-                          readingKey: item.id,
-                          initial: item,
-                        ),
+                        DiscoveredBookScreen(readingKey: item.id, initial: item),
                       ),
+                      onRemove: () => _remove(item),
                     ),
                 ],
               ),
