@@ -10,6 +10,7 @@ import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/shelf_photo_model.dart';
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
 import 'package:shelf_snap/features/discover/screens/discovered_screen.dart';
 import 'package:shelf_snap/features/discover/sheets/discover_genres_sheet.dart';
@@ -54,6 +55,8 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   // scanner opened, newest scan first, one entry per book
   int _discoverPending = 0;
   List<DiscoveredBookModel> _found = const [];
+  // Shelf photos taken since the scanner opened, newest first
+  List<ShelfPhotoModel> _photos = const [];
 
   void _showDuplicate(String isbn) {
     _duplicateTimer?.cancel();
@@ -220,7 +223,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
 
     try {
       final photo = await controller.takePicture();
-      final books = await ref
+      final (:books, photo: shelfPhoto) = await ref
           .read(shelfCaptureServiceProvider)
           .discover(photo.path, controller.value.previewSize!);
       debugPrint(
@@ -252,6 +255,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       final ids = {for (final b in books) b.id};
       setState(() {
         _found = [...books, ..._found.where((b) => !ids.contains(b.id))];
+        if (shelfPhoto != null) _photos = [shelfPhoto, ..._photos];
       });
     } catch (e) {
       debugPrint('Discover capture failed: $e');
@@ -274,6 +278,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
       DiscoverResultsSheet.show(
         context,
         books: _found,
+        photos: _photos,
         onRemoved: (book) {
           if (!mounted) return;
           setState(() {

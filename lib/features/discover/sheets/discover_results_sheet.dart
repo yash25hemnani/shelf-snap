@@ -3,17 +3,22 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/shelf_photo_model.dart';
 import 'package:shelf_snap/features/discover/models/taste_match.dart';
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
 import 'package:shelf_snap/features/discover/screens/discovered_book_screen.dart';
 import 'package:shelf_snap/features/discover/screens/discovered_screen.dart';
+import 'package:shelf_snap/features/discover/screens/shelf_photo_screen.dart';
 import 'package:shelf_snap/features/discover/widgets/discovered_book_tile.dart';
+import 'package:shelf_snap/features/discover/widgets/shelf_photo_view.dart';
 
 // The books found since the scanner opened, best match first. They're
 // already saved to Discovered, so there's no Save button here; a wrong
 // spot is swiped away instead.
 class DiscoverResultsSheet extends ConsumerStatefulWidget {
   final List<DiscoveredBookModel> books;
+  // Shelf photos from this scanner session, newest first
+  final List<ShelfPhotoModel> photos;
   // Lets the scanner drop the book from its own list too, so it doesn't
   // come back when the sheet is reopened
   final ValueChanged<DiscoveredBookModel> onRemoved;
@@ -21,18 +26,24 @@ class DiscoverResultsSheet extends ConsumerStatefulWidget {
   const DiscoverResultsSheet({
     super.key,
     required this.books,
+    this.photos = const [],
     required this.onRemoved,
   });
 
   static Future<void> show(
     BuildContext context, {
     required List<DiscoveredBookModel> books,
+    List<ShelfPhotoModel> photos = const [],
     required ValueChanged<DiscoveredBookModel> onRemoved,
   }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => DiscoverResultsSheet(books: books, onRemoved: onRemoved),
+      builder: (_) => DiscoverResultsSheet(
+        books: books,
+        photos: photos,
+        onRemoved: onRemoved,
+      ),
     );
   }
 
@@ -84,6 +95,11 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
         for (final item in books)
           if (TasteMatch.of(taste, item.genres) == match) (item, match),
     ];
+    final byId = {for (final item in books) item.id: item};
+    final great = {
+      for (final (item, match) in rows)
+        if (match == TasteMatch.strong) item.id,
+    };
 
     return ConstrainedBox(
       constraints: BoxConstraints(
@@ -124,6 +140,15 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
                 ],
               ),
             ),
+            if (widget.photos.isNotEmpty)
+              _PhotoStrip(
+                photos: widget.photos,
+                books: byId,
+                great: great,
+                onOpen: (photo) => _push(
+                  ShelfPhotoScreen(photo: photo, great: great, books: byId),
+                ),
+              ),
             Flexible(
               child: ListView(
                 shrinkWrap: true,
@@ -134,7 +159,10 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
                       item: item,
                       match: match,
                       onTap: () => _push(
-                        DiscoveredBookScreen(readingKey: item.id, initial: item),
+                        DiscoveredBookScreen(
+                          readingKey: item.id,
+                          initial: item,
+                        ),
                       ),
                       onRemove: () => _remove(item),
                     ),
@@ -143,6 +171,53 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// This session's shelf photos in a row, newest first, each with its
+// outlines. Tapping one opens it full screen.
+class _PhotoStrip extends StatelessWidget {
+  final List<ShelfPhotoModel> photos;
+  final Map<String, DiscoveredBookModel> books;
+  final Set<String> great;
+  final ValueChanged<ShelfPhotoModel> onOpen;
+
+  const _PhotoStrip({
+    required this.photos,
+    required this.books,
+    required this.great,
+    required this.onOpen,
+  });
+
+  static const _height = 96.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final only = books.keys.toSet();
+
+    return SizedBox(
+      height: _height,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        itemCount: photos.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final photo = photos[index];
+          return Semantics(
+            button: true,
+            label: 'Open shelf photo ${index + 1}',
+            child: GestureDetector(
+              onTap: () => onOpen(photo),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: ShelfPhotoView(photo: photo, great: great, only: only),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

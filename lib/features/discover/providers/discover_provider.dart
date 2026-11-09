@@ -2,14 +2,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/shelf_photo_model.dart';
 import 'package:shelf_snap/features/discover/repositories/discover_repository.dart';
 import 'package:shelf_snap/features/discover/services/discover_service.dart';
+import 'package:shelf_snap/features/discover/services/shelf_photo_store.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/genre.dart';
 
 final discoverRepositoryProvider = Provider((ref) => DiscoverRepository());
 
 final discoverServiceProvider = Provider((ref) => DiscoverService());
+
+final shelfPhotoStoreProvider = Provider((ref) => ShelfPhotoStore());
+
+// The newest shelf photo on this phone that a book was found on; null when
+// there's none (another phone, cleared, or the web). Invalidated after
+// "Clear shelf photos".
+final shelfPhotoForBookProvider = FutureProvider.autoDispose
+    .family<ShelfPhotoModel?, String>(
+      (ref, readingKey) =>
+          ref.watch(shelfPhotoStoreProvider).latestFor(readingKey),
+    );
 
 // The reader's genres and place. Empty settings when signed out or not
 // set up yet, so the scanner and sheets never have to handle null.

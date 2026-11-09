@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
@@ -160,6 +161,55 @@ class DiscoveredScreen extends ConsumerWidget {
     messenger.showMessage('Added $place to ${_bookCount(keys.length)}');
   }
 
+  static String _size(int bytes) => bytes < 1024 * 1024
+      ? '${(bytes / 1024).ceil()} KB'
+      : '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+
+  // Deletes the shelf photos saved on this phone to free space. The books
+  // stay in Discovered; only their photos and outlines go.
+  Future<void> _clearPhotos(BuildContext context, WidgetRef ref) async {
+    final store = ref.read(shelfPhotoStoreProvider);
+    final messenger = ScaffoldMessenger.of(context);
+
+    final ({int count, int bytes}) usage;
+    try {
+      usage = await store.usage();
+    } catch (e) {
+      debugPrint('shelf photo usage failed: $e');
+      messenger.showError("Couldn't read the shelf photos");
+      return;
+    }
+    if (!context.mounted) return;
+    if (usage.count == 0) {
+      messenger.showMessage('No shelf photos saved on this phone');
+      return;
+    }
+
+    final photos = usage.count == 1
+        ? '1 shelf photo'
+        : '${usage.count} shelf photos';
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.hide_image_outlined,
+      title: 'Clear shelf photos?',
+      message:
+          'Deletes $photos (${_size(usage.bytes)}) saved on this phone. '
+          'Your discovered books stay.',
+      confirmLabel: 'Clear',
+      destructive: true,
+    );
+    if (!confirmed) return;
+
+    try {
+      await store.clear();
+      ref.invalidate(shelfPhotoForBookProvider);
+      messenger.showMessage('Cleared $photos');
+    } catch (e) {
+      debugPrint('clear shelf photos failed: $e');
+      messenger.showError("Couldn't clear the shelf photos");
+    }
+  }
+
   void _search(WidgetRef ref, String text) {
     ref.read(discoveredSearchProvider.notifier).state = text;
     if (text.trim().isNotEmpty) _indexOldBooks(ref);
@@ -231,6 +281,22 @@ class DiscoveredScreen extends ConsumerWidget {
                 : 'Your genres',
           ),
         ),
+        // The web keeps no shelf photos
+        if (!kIsWeb)
+          // onSelected runs after the menu closes, so the dialog can open
+          PopupMenuButton<bool>(
+            onSelected: (_) => _clearPhotos(context, ref),
+            itemBuilder: (_) => const [
+              PopupMenuItem(
+                value: true,
+                child: ListTile(
+                  leading: Icon(Icons.hide_image_outlined),
+                  title: Text('Clear shelf photos'),
+                  contentPadding: EdgeInsets.zero,
+                ),
+              ),
+            ],
+          ),
         const SizedBox(width: 4),
       ],
     );

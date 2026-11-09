@@ -21,10 +21,11 @@ class DiscoverService {
   // Vision model + Google Books lookups can take a while on a full shelf
   static const Duration _timeout = Duration(seconds: 60);
 
-  // Books on the shelf in [imagePath]. Books with no title or author are
-  // dropped, since they can't be saved. [blocks] are OCR hints, in the
-  // [imageWidth] x [imageHeight] coordinate space.
-  Future<List<DiscoveredBookModel>> discoverBooks(
+  // Books on the shelf in [imagePath], plus the upright, shrunk JPEG that was
+  // sent, so it can be kept as the shelf photo. Books with no title or
+  // author are dropped, since they can't be saved. [blocks] are OCR hints,
+  // in the [imageWidth] x [imageHeight] coordinate space.
+  Future<({List<DiscoveredBookModel> books, Uint8List image})> discoverBooks(
     String imagePath,
     List<TextBlock> blocks,
     int imageWidth,
@@ -115,6 +116,6 @@ class DiscoverService {
     for (final b in books) {
       debugPrint('[Discover]   $b');
     }
-    return books;
+    return (books: books, image: imageBytes);
   }
 }

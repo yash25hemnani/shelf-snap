@@ -10,10 +10,13 @@ import 'package:shelf_snap/core/widgets/section_card.dart';
 import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/shelf_photo_model.dart';
 import 'package:shelf_snap/features/discover/models/taste_match.dart';
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
+import 'package:shelf_snap/features/discover/screens/shelf_photo_screen.dart';
 import 'package:shelf_snap/features/discover/sheets/discover_genres_sheet.dart';
 import 'package:shelf_snap/features/discover/widgets/match_pill.dart';
+import 'package:shelf_snap/features/discover/widgets/shelf_photo_view.dart';
 import 'package:shelf_snap/features/library/models/genre.dart';
 import 'package:shelf_snap/features/library/sheets/save_to_library_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/wikipedia_card.dart';
@@ -109,6 +112,9 @@ class _DiscoveredBookScreenState extends ConsumerState<DiscoveredBookScreen> {
         ref.watch(discoverSettingsProvider).valueOrNull ??
         const DiscoverSettingsModel();
     final log = ref.watch(readingLogProvider(widget.readingKey)).valueOrNull;
+    final shelfPhoto = ref
+        .watch(shelfPhotoForBookProvider(widget.readingKey))
+        .valueOrNull;
 
     // A loaded null means the book was removed; while loading, use initial
     final item = bookAsync.hasValue ? bookAsync.value : widget.initial;
@@ -273,6 +279,14 @@ class _DiscoveredBookScreenState extends ConsumerState<DiscoveredBookScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
+                if (shelfPhoto != null) ...[
+                  _ShelfPhotoCard(
+                    photo: shelfPhoto,
+                    readingKey: item.id,
+                    great: match == TasteMatch.strong,
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 WikipediaCard(book: book),
                 SectionCard(
                   icon: Icons.notes_rounded,
@@ -375,6 +389,74 @@ class _GenreBadge extends StatelessWidget {
             genre.label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
               color: yours ? AppColors.onPrimary : AppColors.text,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// The newest shelf photo this book was found on, with the book picked
+// out. Tapping it opens the photo full screen.
+class _ShelfPhotoCard extends StatelessWidget {
+  final ShelfPhotoModel photo;
+  final String readingKey;
+  final bool great;
+
+  const _ShelfPhotoCard({
+    required this.photo,
+    required this.readingKey,
+    required this.great,
+  });
+
+  void _open(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShelfPhotoScreen(
+          photo: photo,
+          highlight: readingKey,
+          great: {if (great) readingKey},
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final taken = 'Taken ${dayMonth(photo.takenAt)}';
+
+    return SectionCard(
+      icon: Icons.photo_outlined,
+      title: 'Shelf photo',
+      trailing: TextButton(
+        onPressed: () => _open(context),
+        child: const Text('View'),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          GestureDetector(
+            onTap: () => _open(context),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 220),
+              child: Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: ShelfPhotoView(photo: photo, highlight: readingKey),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            photo.outlines.containsKey(readingKey)
+                ? taken
+                : "$taken. Its title couldn't be found on the photo.",
+            style: textTheme.bodySmall?.copyWith(
+              color: AppColors.textSecondary,
             ),
           ),
         ],
