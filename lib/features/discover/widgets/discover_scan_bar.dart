@@ -40,12 +40,14 @@ class DiscoverScanBar extends StatelessWidget {
             onTap: onGenres,
           ),
           const SizedBox(width: 8),
-          // Just the star and a count once set, so three pills fit a phone
+          // Only a star (and a count once set), so three pills fit a
+          // small phone and the place keeps room for its name
           _Pill(
             icon: keywords == 0
                 ? Icons.star_outline_rounded
                 : Icons.star_rounded,
-            label: keywords == 0 ? 'Keywords' : '$keywords',
+            label: keywords == 0 ? null : '$keywords',
+            tooltip: 'Your keywords',
             onTap: onKeywords,
           ),
           const SizedBox(width: 8),
@@ -62,15 +64,18 @@ class DiscoverScanBar extends StatelessWidget {
   }
 }
 
+// With a tooltip it's a compact pill: no dropdown arrow, label optional
 class _Pill extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String? label;
+  final String? tooltip;
   final bool highlight;
   final VoidCallback onTap;
 
   const _Pill({
     required this.icon,
-    required this.label,
+    this.label,
+    this.tooltip,
     this.highlight = false,
     required this.onTap,
   });
@@ -78,35 +83,47 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = highlight ? Colors.black : Colors.white;
+    final label = this.label;
+    final tip = tooltip;
+    final compact = tip != null;
 
-    return Material(
+    final pill = Material(
       color: highlight ? Colors.white : Colors.black54,
       shape: const StadiumBorder(side: BorderSide(color: Colors.white38)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+          padding: EdgeInsets.fromLTRB(12, 8, compact ? 12 : 8, 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 18, color: foreground),
-              const SizedBox(width: 6),
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.labelLarge?.copyWith(color: foreground),
-                ),
+              // 24 tall, like the arrow, so every pill is the same height
+              SizedBox(
+                height: 24,
+                child: Icon(icon, size: 18, color: foreground),
               ),
-              Icon(Icons.arrow_drop_down_rounded, color: foreground),
+              if (label != null) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(
+                      context,
+                    ).textTheme.labelLarge?.copyWith(color: foreground),
+                  ),
+                ),
+              ],
+              if (!compact)
+                Icon(Icons.arrow_drop_down_rounded, color: foreground),
             ],
           ),
         ),
       ),
     );
+
+    return tip == null ? pill : Tooltip(message: tip, child: pill);
   }
 }
