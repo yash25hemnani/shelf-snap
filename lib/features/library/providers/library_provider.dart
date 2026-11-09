@@ -28,14 +28,29 @@ final userLibrariesProvider = StreamProvider.family<List<LibraryModel>, String>(
       ref.watch(libraryRepositoryProvider).watchUserLibraries(userId),
 );
 
-// Newest books in a library, up to the current limit
+// True when the signed-in user edits this library; null while it loads.
+// select() so a count change on the library doesn't restart book queries.
+final canEditLibraryProvider = Provider.autoDispose.family<bool?, String>((
+  ref,
+  libraryId,
+) {
+  final uid = ref.watch(currentUidProvider).valueOrNull;
+  return ref.watch(
+    libraryProvider(libraryId).select((a) => a.valueOrNull?.canEdit(uid)),
+  );
+});
+
+// Newest books in a library, up to the current limit. Viewers only get
+// public books, so this waits until it knows who is looking.
 final libraryBooksProvider = StreamProvider.autoDispose
     .family<List<BookModel>, String>((ref, libraryId) {
       final limit = ref.watch(booksLimitProvider(libraryId));
+      final canEdit = ref.watch(canEditLibraryProvider(libraryId));
+      if (canEdit == null) return const Stream.empty();
 
       return ref
           .watch(libraryRepositoryProvider)
-          .watchBooks(libraryId, limit: limit);
+          .watchBooks(libraryId, limit: limit, publicOnly: !canEdit);
     });
 
 final libraryProvider = StreamProvider.autoDispose
@@ -81,9 +96,17 @@ final bookQuerySearchProvider = StreamProvider.autoDispose
       // The longest word narrows the query the most
       words.sort((a, b) => b.length.compareTo(a.length));
 
+      final canEdit = ref.watch(canEditLibraryProvider(args.libraryId));
+      if (canEdit == null) return const Stream.empty();
+
       return ref
           .watch(libraryRepositoryProvider)
-          .searchBooks(args.libraryId, words.first, limit: 20)
+          .searchBooks(
+            args.libraryId,
+            words.first,
+            publicOnly: !canEdit,
+            limit: 20,
+          )
           .map(
             (books) => books.where((book) {
               final tokens = book.searchTokens.toSet();
@@ -106,9 +129,12 @@ final libraryBookSearchProvider = StreamProvider.autoDispose
 
       words.sort((a, b) => b.length.compareTo(a.length));
 
+      final canEdit = ref.watch(canEditLibraryProvider(libraryId));
+      if (canEdit == null) return const Stream.empty();
+
       return ref
           .watch(libraryRepositoryProvider)
-          .searchBooks(libraryId, words.first)
+          .searchBooks(libraryId, words.first, publicOnly: !canEdit)
           .map(
             (books) => books.where((book) {
               final tokens = book.searchTokens.toSet();

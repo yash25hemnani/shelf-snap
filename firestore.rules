@@ -167,11 +167,17 @@ service cloud.firestore {
       allow delete: if signedIn() && uid() == resource.data.ownerId;
 
       match /books/{bookId} {
-        allow read: if signedIn() && isMemberOf(libraryData(libId));
+        // Viewers only see public books, so their queries must filter on
+        // visibility. Every book has the field (seed_visibility.js).
+        allow read: if signedIn() && (
+          isEditorOf(libraryData(libId))
+          || (isMemberOf(libraryData(libId))
+              && resource.data.visibility == 'public'));
 
         // Copies on loan can never be more than the copies owned
         allow create, update: if signedIn()
           && isEditorOf(libraryData(libId))
+          && request.resource.data.get('visibility', 'public') in ['public', 'private']
           && request.resource.data.get('lentCount', 0) >= 0
           && request.resource.data.get('lentCount', 0)
                <= request.resource.data.get('noOfCopies', 1);
@@ -259,13 +265,16 @@ service cloud.firestore {
           && (collect == null || due == null || due > collect);
       }
 
-      // A viewer of the library (not an editor) asking for a book that exists
+      // A viewer of the library (not an editor) asking for a public book
+      // that exists
       function validRequestLibrary() {
         let d = request.resource.data;
         let lib = libraryData(d.libraryId);
+        let book = /databases/$(database)/documents/libraries/$(d.libraryId)/books/$(d.bookId);
         return isMemberOf(lib) && !isEditorOf(lib)
           && d.ownerId == lib.ownerId
-          && exists(/databases/$(database)/documents/libraries/$(d.libraryId)/books/$(d.bookId));
+          && exists(book)
+          && get(book).data.get('visibility', 'public') == 'public';
       }
 
       allow read: if signedIn() && (isBorrower() || isManager());

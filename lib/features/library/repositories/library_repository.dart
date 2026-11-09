@@ -128,13 +128,27 @@ class LibraryRepository {
     return 'Saved ${books(added + copies)}, $extra';
   }
 
-  // Watch books in a library. Each book remembers this library, so it can
-  // be found again by its full path (libraries/{libraryId}/books/{id}).
-  Stream<List<BookModel>> watchBooks(String libraryId, {required int limit}) {
-    return _db
+  // The library's books, only public ones for viewers. The rules turn away
+  // a viewer's query that could return a private book, so the filter is
+  // needed, not just tidy.
+  Query<Map<String, dynamic>> _books(String libraryId, bool publicOnly) {
+    final books = _db
         .collection('libraries')
         .doc(libraryId)
-        .collection('books')
+        .collection('books');
+    return publicOnly
+        ? books.where('visibility', isEqualTo: BookVisibility.public.name)
+        : books;
+  }
+
+  // Watch books in a library. Each book remembers this library, so it can
+  // be found again by its full path (libraries/{libraryId}/books/{id}).
+  Stream<List<BookModel>> watchBooks(
+    String libraryId, {
+    required int limit,
+    required bool publicOnly,
+  }) {
+    return _books(libraryId, publicOnly)
         .orderBy('addedAt', descending: true)
         .limit(limit)
         .snapshots()
@@ -154,12 +168,10 @@ class LibraryRepository {
   Stream<List<BookModel>> searchBooks(
     String libraryId,
     String token, {
+    required bool publicOnly,
     int limit = 50,
   }) {
-    return _db
-        .collection('libraries')
-        .doc(libraryId)
-        .collection('books')
+    return _books(libraryId, publicOnly)
         .where('searchTokens', arrayContains: token)
         .orderBy('addedAt', descending: true)
         .limit(limit)
@@ -271,6 +283,20 @@ class LibraryRepository {
                        .doc(bookId);
 
     await bookRef.update({'originalLanguage': code});
+  }
+
+  // Private books are hidden from viewers; only editors can change this
+  Future<void> updateVisibility(
+    String libraryId,
+    String bookId,
+    BookVisibility visibility,
+  ) {
+    return _db
+        .collection('libraries')
+        .doc(libraryId)
+        .collection('books')
+        .doc(bookId)
+        .update({'visibility': visibility.name});
   }
 
   // One book, live; null once it's deleted

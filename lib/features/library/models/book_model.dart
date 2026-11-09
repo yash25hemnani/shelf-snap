@@ -4,6 +4,9 @@ import 'package:diacritic/diacritic.dart';
 /// Which provider the book details came from.
 enum BookSource { google, openlibrary }
 
+/// Who can see a book in a library. Private books are only for editors.
+enum BookVisibility { public, private }
+
 /// One edition of a book. Mirrors the backend's `BookDetails`, plus the
 /// fields that only exist once the book is saved (id, libraryId, addedAt,
 /// noOfCopies).
@@ -37,6 +40,7 @@ class BookModel {
   final BookSource? source;
   final String? acquisition; // "Bought at Crossword", null = not set
   final String? originalLanguage; // Set by the user, null = not set
+  final BookVisibility visibility;
 
   /// Placeholder when the provider sends no title.
   static const unknownTitle = 'Unknown Title';
@@ -67,6 +71,7 @@ class BookModel {
     this.source,
     this.acquisition,
     this.originalLanguage,
+    this.visibility = BookVisibility.public,
   });
 
   /// One book from /search-books, /isbn-search or /identify-books.
@@ -96,6 +101,10 @@ class BookModel {
         lentCount: (map['lentCount'] as num?)?.toInt(),
         acquisition: map['acquisition'] as String?,
         originalLanguage: map['originalLanguage'] as String?,
+        // Books saved before visibility existed are public
+        visibility:
+            BookVisibility.values.asNameMap()[map['visibility']] ??
+            BookVisibility.public,
       );
 
   Map<String, dynamic> toMap() => {
@@ -117,6 +126,7 @@ class BookModel {
     'source': source?.name,
     'acquisition': acquisition,
     'originalLanguage': originalLanguage,
+    'visibility': visibility.name,
     'searchTokens': searchTokens,
   };
 
@@ -129,6 +139,7 @@ class BookModel {
     int? lentCount,
     String? acquisition,
     String? originalLanguage,
+    BookVisibility? visibility,
   }) => BookModel(
     id: id ?? this.id,
     libraryId: libraryId ?? this.libraryId,
@@ -151,7 +162,10 @@ class BookModel {
     source: source,
     acquisition: acquisition ?? this.acquisition,
     originalLanguage: originalLanguage ?? this.originalLanguage,
+    visibility: visibility ?? this.visibility,
   );
+
+  bool get isPrivate => visibility == BookVisibility.private;
 
   /// Copies on the shelf right now.
   int get availableCopies => noOfCopies - lentCount;

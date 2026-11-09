@@ -169,6 +169,30 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     }
   }
 
+  // The live book flips the switch once the write lands locally
+  Future<void> _setPrivate(bool private) async {
+    final libraryId = widget.book.libraryId;
+    final bookId = widget.book.id;
+    if (libraryId == null || bookId == null) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(libraryRepositoryProvider)
+          .updateVisibility(
+            libraryId,
+            bookId,
+            private ? BookVisibility.private : BookVisibility.public,
+          );
+      messenger.showMessage(
+        private ? 'Hidden from viewers' : 'Visible to everyone in the library',
+      );
+    } catch (e) {
+      debugPrint('updateVisibility failed: $e');
+      messenger.showError("Couldn't save, check your connection");
+    }
+  }
+
   void _openLog(String readingKey) {
     Navigator.push(
       context,
@@ -431,6 +455,18 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                             placeholder: 'Add',
                             onTap: () =>
                                 _editOriginalLanguage(book.originalLanguage),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text('Private', style: textTheme.bodyMedium),
+                            subtitle: Text(
+                              'Only editors can see it',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            value: book.isPrivate,
+                            onChanged: _setPrivate,
                           ),
                         ],
                       ),

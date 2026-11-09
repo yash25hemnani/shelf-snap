@@ -51,6 +51,12 @@ app.*.map.json
 # GSD planning docs (local only)
 .planning/
 
+# Admin scripts: packages and service account keys never go in git
+scripts/node_modules/
+scripts/package*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
+
 # Firebase deploy cache
 .firebase/
 

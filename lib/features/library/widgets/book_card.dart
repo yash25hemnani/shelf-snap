@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 
 class BookCard extends StatelessWidget {
@@ -27,16 +28,33 @@ class BookCard extends StatelessWidget {
           Expanded(
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                width: double.infinity,
-                child: coverUrl == null
-                    ? placeholder
-                    : Image.network(
-                        coverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            placeholder,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  coverUrl == null
+                      ? placeholder
+                      : Image.network(
+                          coverUrl,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              placeholder,
+                        ),
+                  // Only editors get private books, so only they see this
+                  if (book.isPrivate)
+                    const Positioned(
+                      top: 6,
+                      right: 6,
+                      child: CircleAvatar(
+                        radius: 12,
+                        backgroundColor: AppColors.text,
+                        child: Icon(
+                          Icons.lock_rounded,
+                          size: 14,
+                          color: AppColors.onPrimary,
+                        ),
                       ),
+                    ),
+                ],
               ),
             ),
           ),
