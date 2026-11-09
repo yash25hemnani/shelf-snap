@@ -13,12 +13,15 @@ class DiscoverSettingsModel {
   final String? currentPlace; // stays on every scan until changed; null = none
   final List<String> recentPlaces; // newest first, for one-tap reuse
   final DateTime? updatedAt;
+  // True once books saved before search existed got their search words
+  final bool searchIndexed;
 
   const DiscoverSettingsModel({
     this.genres = const [],
     this.currentPlace,
     this.recentPlaces = const [],
     this.updatedAt,
+    this.searchIndexed = false,
   });
 
   // One fixed doc, so there's no id to pass in. A missing doc reads as empty.
@@ -35,6 +38,7 @@ class DiscoverSettingsModel {
       currentPlace: map['currentPlace'] as String?,
       recentPlaces: (map['recentPlaces'] as List?)?.cast<String>() ?? const [],
       updatedAt: (map['updatedAt'] as Timestamp?)?.toDate(),
+      searchIndexed: map['searchIndexed'] as bool? ?? false,
     );
   }
 
@@ -43,6 +47,7 @@ class DiscoverSettingsModel {
     'currentPlace': currentPlace,
     'recentPlaces': recentPlaces,
     'updatedAt': FieldValue.serverTimestamp(),
+    'searchIndexed': searchIndexed,
   };
 
   DiscoverSettingsModel copyWith({
@@ -50,6 +55,7 @@ class DiscoverSettingsModel {
     String? currentPlace,
     bool clearCurrentPlace = false,
     List<String>? recentPlaces,
+    bool? searchIndexed,
   }) {
     return DiscoverSettingsModel(
       genres: genres ?? this.genres,
@@ -58,6 +64,7 @@ class DiscoverSettingsModel {
           : currentPlace ?? this.currentPlace,
       recentPlaces: recentPlaces ?? this.recentPlaces,
       updatedAt: updatedAt,
+      searchIndexed: searchIndexed ?? this.searchIndexed,
     );
   }
 

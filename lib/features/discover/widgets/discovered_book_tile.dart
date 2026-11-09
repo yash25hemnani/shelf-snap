@@ -14,6 +14,9 @@ class DiscoveredBookTile extends StatelessWidget {
   final DiscoveredBookModel item;
   final TasteMatch? match;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+  // Picked for a bulk action: the cover shows a tick
+  final bool selected;
   // When set, swiping left removes the book. Resolves true when the book
   // was removed, so the row slides away; false snaps it back.
   final Future<bool> Function()? onRemove;
@@ -23,6 +26,8 @@ class DiscoveredBookTile extends StatelessWidget {
     required this.item,
     this.match,
     required this.onTap,
+    this.onLongPress,
+    this.selected = false,
     this.onRemove,
   });
 
@@ -50,6 +55,7 @@ class DiscoveredBookTile extends StatelessWidget {
 
     final tile = InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -60,13 +66,26 @@ class DiscoveredBookTile extends StatelessWidget {
               child: SizedBox(
                 width: _coverWidth,
                 height: _coverHeight,
-                child: coverUrl == null
-                    ? placeholder
-                    : Image.network(
-                        coverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => placeholder,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    coverUrl == null
+                        ? placeholder
+                        : Image.network(
+                            coverUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => placeholder,
+                          ),
+                    if (selected)
+                      ColoredBox(
+                        color: AppColors.primary.withValues(alpha: 0.8),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.onPrimary,
+                        ),
                       ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 14),

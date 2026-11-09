@@ -76,12 +76,17 @@ service cloud.firestore {
           && request.resource.data.get('genres', []) is list
           && request.resource.data.get('genres', []).size() <= 2
           && request.resource.data.seenCount is int
-          && request.resource.data.lastSeenAt == request.time
+          // A scan stamps the server time; tagging a place keeps the old one
+          && (request.resource.data.lastSeenAt == request.time
+              || (resource != null
+                  && request.resource.data.lastSeenAt == resource.data.lastSeenAt))
           && (request.resource.data.get('lastPlace', null) == null
               || (request.resource.data.lastPlace is string
                   && request.resource.data.lastPlace.size() <= 60))
           && request.resource.data.get('places', []) is list
-          && request.resource.data.get('places', []).size() <= 50;
+          && request.resource.data.get('places', []).size() <= 50
+          && request.resource.data.get('searchTokens', []) is list
+          && request.resource.data.get('searchTokens', []).size() <= 300;
       }
 
       // Per-user settings, one doc per feature. Owner only: users/{uid}
@@ -91,7 +96,9 @@ service cloud.firestore {
         allow create, update: if uid() == userId
           && docId == 'discover'
           && request.resource.data.keys().hasOnly(
-               ['genres', 'currentPlace', 'recentPlaces', 'updatedAt'])
+               ['genres', 'currentPlace', 'recentPlaces', 'updatedAt',
+                'searchIndexed'])
+          && request.resource.data.get('searchIndexed', false) is bool
           && request.resource.data.genres is list
           && request.resource.data.genres.size() <= 30
           && (request.resource.data.currentPlace == null

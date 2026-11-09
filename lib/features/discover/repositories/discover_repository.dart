@@ -66,6 +66,69 @@ class DiscoverRepository {
         });
   }
 
+  // Most recently seen books with a title, subtitle or author word that
+  // starts with [token]. Needs a composite index:
+  // searchTokens CONTAINS + lastSeenAt DESC.
+  Stream<List<DiscoveredBookModel>> searchDiscovered(
+    String userId,
+    String token, {
+    int limit = 50,
+  }) {
+    return _discovered(userId)
+        .where('searchTokens', arrayContains: token)
+        .orderBy('lastSeenAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => DiscoveredBookModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
+  }
+
+  // One-time fill-in for books saved before search existed. Firestore
+  // can't query for a missing field, so it reads every book once, then sets
+  // searchIndexed in the settings so it never runs again.
+  // Reads from the server only: a half-filled offline cache would set the
+  // flag too early.
+  Future<void> indexForSearch(String userId) async {
+    try {
+      final snap = await _discovered(
+        userId,
+      ).get(const GetOptions(source: Source.server));
+      final missing = snap.docs
+          .where((doc) => doc.data()['searchTokens'] == null)
+          .toList();
+
+      // A batch takes at most 500 writes
+      for (var i = 0; i < missing.length; i += 500) {
+        final batch = _db.batch();
+        for (final doc in missing.skip(i).take(500)) {
+          final item = DiscoveredBookModel.fromMap(doc.id, doc.data());
+          batch.update(doc.reference, {'searchTokens': item.searchTokens});
+        }
+        await batch.commit();
+      }
+
+      // update() keeps any genre or place change made meanwhile; a
+      // missing settings doc is created with the defaults
+      final settingsRef = _settings(userId);
+      final settingsDoc = await settingsRef.get();
+      if (settingsDoc.exists) {
+        await settingsRef.update({
+          'searchIndexed': true,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        await settingsRef.set(
+          const DiscoverSettingsModel(searchIndexed: true).toMap(),
+        );
+      }
+    } catch (e) {
+      throw Exception('Could not prepare search');
+    }
+  }
+
   // One discovered book, for the detail page; null when it was removed
   Stream<DiscoveredBookModel?> watchBook(String userId, String readingKey) {
     return _discovered(userId)
@@ -124,6 +187,44 @@ class DiscoverRepository {
       await _discovered(userId).doc(readingKey).delete();
     } catch (e) {
       throw Exception('Could not remove this book');
+    }
+  }
+
+  // Removes several books at once. A batch takes 500 writes, and the
+  // selection can't be bigger than the loaded list.
+  Future<void> deleteBooks(String userId, Iterable<String> readingKeys) async {
+    final batch = _db.batch();
+    for (final key in readingKeys) {
+      batch.delete(_discovered(userId).doc(key));
+    }
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Could not remove these books');
+    }
+  }
+
+  // Tags books with a place without marking them as seen again, so they
+  // keep their spot in the list. The caller skips books already holding
+  // the most places, or the rules reject the whole batch.
+  Future<void> addPlace(
+    String userId,
+    Iterable<String> readingKeys,
+    String place,
+  ) async {
+    final batch = _db.batch();
+    for (final key in readingKeys) {
+      batch.update(_discovered(userId).doc(key), {
+        'lastPlace': place,
+        'places': FieldValue.arrayUnion([place]),
+      });
+    }
+
+    try {
+      await batch.commit();
+    } catch (e) {
+      throw Exception('Could not add the place');
     }
   }
 }

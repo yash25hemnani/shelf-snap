@@ -9,20 +9,25 @@ import 'package:shelf_snap/features/discover/models/discover_settings_model.dart
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
 
 // Sets the place that every Discover scan is tagged with until it's
-// changed: type a new one, tap a recent one, or clear it
+// changed: type a new one, tap a recent one, or clear it.
+// With [pickOnly] it saves nothing and returns the chosen name instead,
+// for tagging books that were already found.
 class PlaceSheet extends ConsumerStatefulWidget {
   final DiscoverSettingsModel settings;
+  final bool pickOnly;
 
-  const PlaceSheet({super.key, required this.settings});
+  const PlaceSheet({super.key, required this.settings, this.pickOnly = false});
 
-  static Future<void> show(
+  // Resolves to the picked name in pickOnly mode, otherwise null
+  static Future<String?> show(
     BuildContext context, {
     required DiscoverSettingsModel settings,
+    bool pickOnly = false,
   }) {
-    return showModalBottomSheet<void>(
+    return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => PlaceSheet(settings: settings),
+      builder: (_) => PlaceSheet(settings: settings, pickOnly: pickOnly),
     );
   }
 
@@ -32,12 +37,19 @@ class PlaceSheet extends ConsumerStatefulWidget {
 
 class _PlaceSheetState extends ConsumerState<PlaceSheet> {
   late final _controller = TextEditingController(
-    text: widget.settings.currentPlace,
+    text: widget.pickOnly ? null : widget.settings.currentPlace,
   );
 
   // Not awaited, like the genre save, so it still works offline.
   // A blank name clears the place.
   void _save(String? place) {
+    if (widget.pickOnly) {
+      // withPlace trims and caps the name the same way a scan's place is
+      final name = widget.settings.withPlace(place).currentPlace;
+      if (name != null) Navigator.pop(context, name);
+      return;
+    }
+
     final userId = ref.read(currentUidProvider).valueOrNull;
     if (userId == null) return;
 
@@ -63,7 +75,9 @@ class _PlaceSheetState extends ConsumerState<PlaceSheet> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final current = widget.settings.currentPlace;
+    final pickOnly = widget.pickOnly;
+    // Picking for books has no "current" place to highlight
+    final current = pickOnly ? null : widget.settings.currentPlace;
     final recent = widget.settings.recentPlaces;
 
     return Padding(
@@ -76,10 +90,15 @@ class _PlaceSheetState extends ConsumerState<PlaceSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Where are you?', style: textTheme.titleLarge),
+              Text(
+                pickOnly ? 'Add a place' : 'Where are you?',
+                style: textTheme.titleLarge,
+              ),
               const SizedBox(height: 4),
               Text(
-                'Books you scan are tagged with this place until you change it',
+                pickOnly
+                    ? 'The selected books are tagged with this place'
+                    : 'Books you scan are tagged with this place until you change it',
                 style: textTheme.bodyMedium?.copyWith(
                   color: AppColors.textSecondary,
                 ),
@@ -87,7 +106,7 @@ class _PlaceSheetState extends ConsumerState<PlaceSheet> {
               const SizedBox(height: 16),
               TextField(
                 controller: _controller,
-                autofocus: current == null && recent.isEmpty,
+                autofocus: (pickOnly || current == null) && recent.isEmpty,
                 maxLength: DiscoverSettingsModel.maxPlaceLength,
                 textCapitalization: TextCapitalization.words,
                 textInputAction: TextInputAction.done,
@@ -126,11 +145,12 @@ class _PlaceSheetState extends ConsumerState<PlaceSheet> {
               const SizedBox(height: 24),
               Row(
                 children: [
-                  TextButton(
-                    // Nothing to clear when no place is set
-                    onPressed: current == null ? null : () => _save(null),
-                    child: const Text('No place'),
-                  ),
+                  if (!pickOnly)
+                    TextButton(
+                      // Nothing to clear when no place is set
+                      onPressed: current == null ? null : () => _save(null),
+                      child: const Text('No place'),
+                    ),
                   const Spacer(),
                   ListenableBuilder(
                     listenable: _controller,
@@ -141,7 +161,7 @@ class _PlaceSheetState extends ConsumerState<PlaceSheet> {
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 28),
                       ),
-                      child: const Text('Set place'),
+                      child: Text(pickOnly ? 'Add place' : 'Set place'),
                     ),
                   ),
                 ],

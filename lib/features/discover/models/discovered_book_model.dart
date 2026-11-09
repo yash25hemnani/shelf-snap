@@ -13,6 +13,10 @@ class DiscoveredBookModel {
   // would make the whole scan's save fail
   static const maxPlaces = 50;
 
+  // Rules cap the stored search words here; only a very long title and
+  // subtitle get near it
+  static const maxSearchTokens = 300;
+
   final String id; // the readingKey
   final BookModel book;
   final List<Genre> genres; // empty = the model didn't know the book
@@ -91,6 +95,7 @@ class DiscoveredBookModel {
     'lastSeenAt': Timestamp.fromDate(lastSeenAt ?? DateTime.now()),
     'lastPlace': lastPlace,
     'places': places,
+    'searchTokens': searchTokens,
   };
 
   DiscoveredBookModel copyWith({
@@ -114,6 +119,11 @@ class DiscoveredBookModel {
 
   // Where it was first seen; null when every scan had no place
   String? get firstPlace => places.isEmpty ? null : places.first;
+
+  // Word starts of the title, subtitle and authors, the same as library
+  // books, so a search query can find the book with arrayContains
+  List<String> get searchTokens =>
+      book.searchTokens.take(maxSearchTokens).toList();
 
   @override
   String toString() =>
