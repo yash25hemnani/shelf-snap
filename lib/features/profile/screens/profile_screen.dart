@@ -49,6 +49,8 @@ class ProfileScreen extends ConsumerWidget {
 
     final profile = ref.watch(userProfileProvider(user.uid)).valueOrNull;
     final libraries = ref.watch(userLibrariesProvider(user.uid)).valueOrNull;
+    // Only libraries the user owns count toward their stats
+    final owned = libraries?.where((l) => l.ownerId == user.uid).toList();
     // Requests in the user's libraries still waiting for an answer
     final waiting =
         ref
@@ -108,9 +110,9 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
 
           _StatsCard(
-            libraries: libraries?.length,
+            libraries: owned?.length,
             // Libraries store their own counts, so no extra reads
-            books: libraries?.fold<int>(
+            books: owned?.fold<int>(
               0,
               (sum, library) => sum + library.bookCount,
             ),
