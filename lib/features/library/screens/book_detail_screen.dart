@@ -17,6 +17,7 @@ import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
+import 'package:shelf_snap/features/library/widgets/wikipedia_card.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/providers/reading_log_provider.dart';
 import 'package:shelf_snap/features/reading/screens/reading_log_detail_screen.dart';
@@ -437,6 +438,7 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                     const SizedBox(height: 12),
                   ],
 
+                  WikipediaCard(book: book),
                   SectionCard(
                     icon: Icons.notes_rounded,
                     title: 'Summary',
