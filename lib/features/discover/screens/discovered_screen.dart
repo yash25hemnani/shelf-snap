@@ -9,10 +9,12 @@ import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/keyword_match.dart';
 import 'package:shelf_snap/features/discover/models/taste_match.dart';
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
 import 'package:shelf_snap/features/discover/screens/discovered_book_screen.dart';
 import 'package:shelf_snap/features/discover/sheets/discover_genres_sheet.dart';
+import 'package:shelf_snap/features/discover/sheets/discover_keywords_sheet.dart';
 import 'package:shelf_snap/features/discover/sheets/place_sheet.dart';
 import 'package:shelf_snap/features/discover/widgets/discovered_book_tile.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
@@ -272,6 +274,20 @@ class DiscoveredScreen extends ConsumerWidget {
       titleSpacing: 0,
       shape: const Border(bottom: BorderSide(color: AppColors.border)),
       actions: [
+        IconButton(
+          tooltip: 'Your keywords',
+          onPressed: () => DiscoverKeywordsSheet.show(context),
+          icon: Badge(
+            isLabelVisible: settings.hasKeywords,
+            label: Text('${settings.keywords.length}'),
+            backgroundColor: AppColors.primary,
+            child: Icon(
+              settings.hasKeywords
+                  ? Icons.star_rounded
+                  : Icons.star_outline_rounded,
+            ),
+          ),
+        ),
         TextButton.icon(
           onPressed: () => showDiscoverGenresSheet(context, ref, settings),
           icon: const Icon(Icons.tune_rounded, size: 18),
@@ -537,6 +553,7 @@ class _BookList extends StatelessWidget {
     final selecting = selected.isNotEmpty;
     return DiscoveredBookTile(
       item: item,
+      keywordHits: KeywordMatch.of(settings.keywords, item.book),
       selected: selected.contains(item.id),
       onTap: () => selecting ? onToggle(item) : onOpen(item),
       onLongPress: () => onToggle(item),
@@ -556,16 +573,54 @@ class _BookList extends StatelessWidget {
     );
   }
 
+  Widget _heading(TextTheme textTheme, String text, int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(text, style: textTheme.titleSmall),
+          const SizedBox(width: 8),
+          Text(
+            '$count',
+            style: textTheme.labelMedium?.copyWith(color: AppColors.hint),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+
+    // Keyword matches go above everything else, whatever their genre
+    final starred = [
+      for (final item in books)
+        if (KeywordMatch.of(settings.keywords, item.book).isNotEmpty) item,
+    ];
+    final starredIds = {for (final item in starred) item.id};
+    final rest = [
+      for (final item in books)
+        if (!starredIds.contains(item.id)) item,
+    ];
+    final starredGroup = [
+      if (starred.isNotEmpty) ...[
+        _heading(textTheme, 'Your keywords', starred.length),
+        for (final item in starred) _tile(item),
+      ],
+    ];
 
     if (!settings.hasGenres) {
       return ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           _PickGenresCard(onTap: onPickGenres),
-          for (final item in books) _tile(item),
+          ...starredGroup,
+          if (starred.isNotEmpty && rest.isNotEmpty)
+            _heading(textTheme, 'Everything else', rest.length),
+          for (final item in rest) _tile(item),
           if (canLoadMore) _loadMoreButton(),
         ],
       );
@@ -575,32 +630,17 @@ class _BookList extends StatelessWidget {
     final groups = <TasteMatch, List<DiscoveredBookModel>>{
       for (final match in TasteMatch.values) match: [],
     };
-    for (final item in books) {
+    for (final item in rest) {
       groups[TasteMatch.of(settings.genres, item.genres)]!.add(item);
     }
 
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
+        ...starredGroup,
         for (final MapEntry(key: match, value: items) in groups.entries)
           if (items.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(match.heading, style: textTheme.titleSmall),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${items.length}',
-                    style: textTheme.labelMedium?.copyWith(
-                      color: AppColors.hint,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            _heading(textTheme, match.heading, items.length),
             // The group heading already says the match
             for (final item in items) _tile(item),
           ],

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/keyword_match.dart';
 import 'package:shelf_snap/features/discover/models/shelf_photo_model.dart';
 import 'package:shelf_snap/features/discover/models/taste_match.dart';
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
@@ -83,10 +84,10 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
   Widget build(BuildContext context) {
     final books = _books;
     final textTheme = Theme.of(context).textTheme;
-    final taste =
-        (ref.watch(discoverSettingsProvider).valueOrNull ??
-                const DiscoverSettingsModel())
-            .genres;
+    final settings =
+        ref.watch(discoverSettingsProvider).valueOrNull ??
+        const DiscoverSettingsModel();
+    final taste = settings.genres;
 
     // Best match first, keeping the newest-first order within each match.
     // null is last: it's every book when no genres are picked.
@@ -158,6 +159,10 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
                     DiscoveredBookTile(
                       item: item,
                       match: match,
+                      keywordHits: KeywordMatch.of(
+                        settings.keywords,
+                        item.book,
+                      ),
                       onTap: () => _push(
                         DiscoveredBookScreen(
                           readingKey: item.id,

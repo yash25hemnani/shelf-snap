@@ -97,8 +97,10 @@ service cloud.firestore {
           && docId == 'discover'
           && request.resource.data.keys().hasOnly(
                ['genres', 'currentPlace', 'recentPlaces', 'updatedAt',
-                'searchIndexed'])
+                'searchIndexed', 'keywords'])
           && request.resource.data.get('searchIndexed', false) is bool
+          && request.resource.data.get('keywords', []) is list
+          && request.resource.data.get('keywords', []).size() <= 30
           && request.resource.data.genres is list
           && request.resource.data.genres.size() <= 30
           && (request.resource.data.currentPlace == null

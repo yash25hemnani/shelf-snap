@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/date_format.dart';
 import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/models/keyword_match.dart';
 import 'package:shelf_snap/features/discover/models/taste_match.dart';
+import 'package:shelf_snap/features/discover/widgets/highlighted_text.dart';
 import 'package:shelf_snap/features/discover/widgets/match_pill.dart';
 
 // One discovered book as a row: cover, title, author, where it was seen,
@@ -13,6 +15,8 @@ class DiscoveredBookTile extends StatelessWidget {
 
   final DiscoveredBookModel item;
   final TasteMatch? match;
+  // The reader's keywords this book matches (KeywordMatch.of)
+  final List<String> keywordHits;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
   // Picked for a bulk action: the cover shows a tick
@@ -25,6 +29,7 @@ class DiscoveredBookTile extends StatelessWidget {
     super.key,
     required this.item,
     this.match,
+    this.keywordHits = const [],
     required this.onTap,
     this.onLongPress,
     this.selected = false,
@@ -46,6 +51,7 @@ class DiscoveredBookTile extends StatelessWidget {
     final match = this.match;
     final seen = _seen;
     final coverUrl = item.book.coverUrl;
+    final hitWords = KeywordMatch.words(keywordHits);
     const placeholder = ColoredBox(
       color: AppColors.surfaceMuted,
       child: Center(
@@ -93,21 +99,44 @@ class DiscoveredBookTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  HighlightedText(
                     item.book.title,
+                    words: hitWords,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: textTheme.titleSmall,
                   ),
                   const SizedBox(height: 2),
-                  Text(
+                  HighlightedText(
                     item.book.authorLine ?? 'Unknown author',
+                    words: item.book.authors.isEmpty ? const {} : hitWords,
                     maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: textTheme.bodySmall?.copyWith(
                       color: AppColors.textSecondary,
                     ),
                   ),
+                  if (keywordHits.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.star_rounded,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            keywordHits.join(', '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.labelMedium?.copyWith(
+                              color: AppColors.primaryDark,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   if (match != null || seen != null) ...[
                     const SizedBox(height: 8),
                     Row(
