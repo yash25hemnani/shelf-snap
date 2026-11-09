@@ -16,6 +16,8 @@ class SearchException implements Exception {
 }
 
 class BookSearchService {
+  static const pageSize = 20;
+
   // The normalized ISBN if [text] is an ISBN-10 or ISBN-13 (hyphens and
   // spaces allowed), otherwise null
   String? _parseIsbn(String text) {
@@ -23,30 +25,37 @@ class BookSearchService {
     return RegExp(r'^(\d{9}[\dX]|\d{13})$').hasMatch(isbn) ? isbn : null;
   }
 
-  /// Open Library search by title or author and up to 3 genres. A typed
-  /// ISBN goes to the exact lookup instead.
-  Future<List<BookModel>> searchBooks(SearchQuery query) async {
+  /// Open Library search by title or author and up to 3 genres, one page
+  /// at a time. A typed ISBN goes to the exact lookup instead.
+  /// [total] is how many matches the backend reports across all pages.
+  Future<({List<BookModel> books, int total})> searchBooks(
+    SearchQuery query, {
+    int page = 1,
+  }) async {
     final isbn = _parseIsbn(query.trimmedText);
     if (isbn != null && query.genres.isEmpty) {
       final book = await lookupIsbn(isbn);
-      return book == null ? [] : [book];
+      return book == null
+          ? (books: <BookModel>[], total: 0)
+          : (books: [book], total: 1);
     }
 
     return _getBooks('/search-books', {
       if (query.hasText) query.field.name: query.trimmedText,
       if (query.genres.isNotEmpty)
         'genre': query.genres.map((genre) => genre.subject).join(','),
-      'limit': '20',
+      'limit': '$pageSize',
+      'page': '$page',
     });
   }
 
   /// Exact ISBN lookup (Open Library on the backend). Null if not found.
   Future<BookModel?> lookupIsbn(String isbn) async {
-    final books = await _getBooks('/isbn-search', {'isbn': isbn});
-    return books.isEmpty ? null : books.first;
+    final result = await _getBooks('/isbn-search', {'isbn': isbn});
+    return result.books.isEmpty ? null : result.books.first;
   }
 
-  Future<List<BookModel>> _getBooks(
+  Future<({List<BookModel> books, int total})> _getBooks(
     String path,
     Map<String, String> params,
   ) async {
@@ -76,9 +85,15 @@ class BookSearchService {
         ? decoded['books'] as List<dynamic>
         : [];
 
-    return booksJson
+    final books = booksJson
         .whereType<Map<String, dynamic>>()
         .map(BookModel.fromApi)
         .toList();
+    // The ISBN route sends no total
+    final total = decoded is Map && decoded['total'] is int
+        ? decoded['total'] as int
+        : books.length;
+
+    return (books: books, total: total);
   }
 }

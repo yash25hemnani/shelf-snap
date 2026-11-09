@@ -4,16 +4,6 @@ import 'package:shelf_snap/features/library/models/genre.dart';
 
 // One genre on the Search shelf: a solid colour tile with white text
 class GenreTile extends StatelessWidget {
-  // Dark enough for white text. Five colours over two columns so the
-  // same colour never stacks straight down a column.
-  static const _fills = [
-    AppColors.primary,
-    AppColors.accent,
-    AppColors.secondary,
-    AppColors.primaryDark,
-    AppColors.info,
-  ];
-
   final Genre genre;
   final VoidCallback onTap;
 
@@ -22,7 +12,7 @@ class GenreTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _fills[genre.index % _fills.length],
+      color: AppColors.genreFills[genre.index % AppColors.genreFills.length],
       borderRadius: BorderRadius.circular(16),
       // Keeps the tap ripple inside the rounded corners
       clipBehavior: Clip.antiAlias,
@@ -49,8 +39,9 @@ class GenreTile extends StatelessWidget {
                   genre.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleSmall
-                      ?.copyWith(color: AppColors.onPrimary),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(color: AppColors.onPrimary),
                 ),
               ),
             ),

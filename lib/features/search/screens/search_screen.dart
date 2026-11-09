@@ -3,11 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/genre.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
+import 'package:shelf_snap/features/library/sheets/genre_picker_sheet.dart';
 import 'package:shelf_snap/features/library/sheets/save_to_library_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/book_card.dart';
 import 'package:shelf_snap/features/search/models/search_query.dart';
 import 'package:shelf_snap/features/search/providers/search_provider.dart';
-import 'package:shelf_snap/features/search/sheets/search_filter_sheet.dart';
 import 'package:shelf_snap/features/search/widgets/genre_tile.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -58,9 +58,13 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   }
 
   Future<void> _openFilters() async {
-    final genres = await SearchFilterSheet.show(
+    final genres = await GenrePickerSheet.show(
       context,
-      genres: _query.genres,
+      title: 'Genres',
+      subtitle: 'Each genre adds its own results',
+      selected: _query.genres,
+      max: SearchQuery.maxGenres,
+      actionLabel: 'Show results',
     );
     if (genres != null && mounted) {
       _update(_query.copyWith(genres: genres));
@@ -121,39 +125,70 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           Expanded(
             child: _query.isEmpty
                 ? _GenreShelf(
-                    onGenre: (genre) => _update(_query.copyWith(genres: {genre})),
+                    onGenre: (genre) =>
+                        _update(_query.copyWith(genres: {genre})),
                   )
                 : resultsAsync.when(
-                    data: (books) {
+                    data: (results) {
+                      final books = results.books;
                       if (books.isEmpty) {
                         return const Center(child: Text('No books found'));
                       }
 
-                      return GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                        gridDelegate:
-                            const SliverGridDelegateWithMaxCrossAxisExtent(
-                              maxCrossAxisExtent: 130,
-                              mainAxisExtent: 210,
-                              crossAxisSpacing: 13,
-                              mainAxisSpacing: 16,
-                            ),
-                        itemCount: books.length,
-                        itemBuilder: (context, index) {
-                          final book = books[index];
-                          return BookCard(
-                            book: book,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => BookDetailScreen(
-                                  book: book,
-                                  onAdd: () => _addBook(book),
-                                ),
+                      return NotificationListener<ScrollNotification>(
+                        onNotification: (notification) {
+                          // 300px early so the next page is usually there
+                          // before the user reaches the end
+                          if (notification.metrics.extentAfter < 300) {
+                            ref
+                                .read(searchResultsProvider(_query).notifier)
+                                .loadMore();
+                          }
+                          return false;
+                        },
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                              sliver: SliverGrid.builder(
+                                gridDelegate:
+                                    const SliverGridDelegateWithMaxCrossAxisExtent(
+                                      maxCrossAxisExtent: 130,
+                                      mainAxisExtent: 210,
+                                      crossAxisSpacing: 13,
+                                      mainAxisSpacing: 16,
+                                    ),
+                                itemCount: books.length,
+                                itemBuilder: (context, index) {
+                                  final book = books[index];
+                                  return BookCard(
+                                    book: book,
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => BookDetailScreen(
+                                          book: book,
+                                          onAdd: () => _addBook(book),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
                             ),
-                          );
-                        },
+                            // Its own sliver so the spinner spans the whole
+                            // row instead of taking one grid cell
+                            if (results.loadingMore)
+                              const SliverToBoxAdapter(
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom: 24),
+                                  child: Center(
+                                    child: CircularProgressIndicator(),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
                       );
                     },
                     error: (err, stack) => Center(child: Text('$err')),
@@ -212,10 +247,7 @@ class _FilterRow extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(left: 4),
             child: Center(
-              child: TextButton(
-                onPressed: onClear,
-                child: const Text('Clear'),
-              ),
+              child: TextButton(onPressed: onClear, child: const Text('Clear')),
             ),
           ),
         ],
@@ -235,10 +267,7 @@ class _GenreShelf extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
       children: [
-        Text(
-          'Browse by genre',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        Text('Browse by genre', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,

@@ -40,6 +40,11 @@ class AppColors {
   static const accent = Color(0xFF3A6EA5);
   static const accentSoft = Color(0xFFE6EEF7);
 
+  // Genre colours, dark enough for white text. A genre's colour is
+  // genreFills[genre.index % length]; five over two columns means the
+  // same colour never stacks straight down the Search shelf.
+  static const genreFills = [primary, accent, secondary, primaryDark, info];
+
   // Avatar colours as [text, background]; each user always gets the same pair
   static const avatarColors = <List<Color>>[
     [primary, primarySoft],
