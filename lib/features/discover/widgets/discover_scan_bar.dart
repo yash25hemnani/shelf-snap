@@ -1,24 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
 
-// Two pills over the camera in Discover mode: your genres and the current
-// place. Both stay visible, so a place left on from yesterday gets noticed.
-// Raw colours are fine here, like the rest of the scanner UI.
+// Pills over the camera in Discover mode: your genres, your keywords and
+// the current place. All stay visible, so a place left on from yesterday
+// gets noticed. Raw colours are fine here, like the rest of the scanner UI.
 class DiscoverScanBar extends StatelessWidget {
   final DiscoverSettingsModel settings;
   final VoidCallback onGenres;
+  final VoidCallback onKeywords;
   final VoidCallback onPlace;
 
   const DiscoverScanBar({
     super.key,
     required this.settings,
     required this.onGenres,
+    required this.onKeywords,
     required this.onPlace,
   });
 
   @override
   Widget build(BuildContext context) {
     final count = settings.genres.length;
+    final keywords = settings.keywords.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -35,6 +38,15 @@ class DiscoverScanBar extends StatelessWidget {
             // White until genres are picked, since matching needs them
             highlight: count == 0,
             onTap: onGenres,
+          ),
+          const SizedBox(width: 8),
+          // Just the star and a count once set, so three pills fit a phone
+          _Pill(
+            icon: keywords == 0
+                ? Icons.star_outline_rounded
+                : Icons.star_rounded,
+            label: keywords == 0 ? 'Keywords' : '$keywords',
+            onTap: onKeywords,
           ),
           const SizedBox(width: 8),
           Flexible(

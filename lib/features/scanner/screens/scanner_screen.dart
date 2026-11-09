@@ -14,6 +14,7 @@ import 'package:shelf_snap/features/discover/models/shelf_photo_model.dart';
 import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
 import 'package:shelf_snap/features/discover/screens/discovered_screen.dart';
 import 'package:shelf_snap/features/discover/sheets/discover_genres_sheet.dart';
+import 'package:shelf_snap/features/discover/sheets/discover_keywords_sheet.dart';
 import 'package:shelf_snap/features/discover/sheets/discover_results_sheet.dart';
 import 'package:shelf_snap/features/discover/sheets/place_sheet.dart';
 import 'package:shelf_snap/features/discover/widgets/discover_scan_bar.dart';
@@ -383,6 +384,7 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                       settings: settings,
                       onGenres: () =>
                           showDiscoverGenresSheet(context, ref, settings),
+                      onKeywords: () => DiscoverKeywordsSheet.show(context),
                       onPlace: () =>
                           PlaceSheet.show(context, settings: settings),
                     ),

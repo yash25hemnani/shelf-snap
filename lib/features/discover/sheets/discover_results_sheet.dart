@@ -89,12 +89,20 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
         const DiscoverSettingsModel();
     final taste = settings.genres;
 
-    // Best match first, keeping the newest-first order within each match.
-    // null is last: it's every book when no genres are picked.
+    // Keyword matches first, then best genre match, keeping the
+    // newest-first order within each. null is last: it's every book when
+    // no genres are picked.
+    final hits = {
+      for (final item in books)
+        item.id: KeywordMatch.of(settings.keywords, item.book),
+    };
     final rows = [
-      for (final match in [...TasteMatch.values, null])
-        for (final item in books)
-          if (TasteMatch.of(taste, item.genres) == match) (item, match),
+      for (final starred in [true, false])
+        for (final match in [...TasteMatch.values, null])
+          for (final item in books)
+            if (hits[item.id]!.isNotEmpty == starred &&
+                TasteMatch.of(taste, item.genres) == match)
+              (item, match),
     ];
     final byId = {for (final item in books) item.id: item};
     final great = {
@@ -159,10 +167,7 @@ class _DiscoverResultsSheetState extends ConsumerState<DiscoverResultsSheet> {
                     DiscoveredBookTile(
                       item: item,
                       match: match,
-                      keywordHits: KeywordMatch.of(
-                        settings.keywords,
-                        item.book,
-                      ),
+                      keywordHits: hits[item.id]!,
                       onTap: () => _push(
                         DiscoveredBookScreen(
                           readingKey: item.id,
