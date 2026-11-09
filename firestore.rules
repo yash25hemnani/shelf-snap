@@ -66,6 +66,41 @@ service cloud.firestore {
           && request.resource.data.at == request.time;
         allow delete: if uid() == userId;
       }
+
+      // Books spotted in Discover mode, keyed by readingKey. Owner only,
+      // since places say where the reader has been.
+      match /discovered/{readingKey} {
+        allow read, delete: if uid() == userId;
+        allow create, update: if uid() == userId
+          && request.resource.data.title is string
+          && request.resource.data.get('genres', []) is list
+          && request.resource.data.get('genres', []).size() <= 2
+          && request.resource.data.seenCount is int
+          && request.resource.data.lastSeenAt == request.time
+          && (request.resource.data.get('lastPlace', null) == null
+              || (request.resource.data.lastPlace is string
+                  && request.resource.data.lastPlace.size() <= 60))
+          && request.resource.data.get('places', []) is list
+          && request.resource.data.get('places', []).size() <= 50;
+      }
+
+      // Per-user settings, one doc per feature. Owner only: users/{uid}
+      // is readable by everyone, so these can't live there.
+      match /settings/{docId} {
+        allow read, delete: if uid() == userId;
+        allow create, update: if uid() == userId
+          && docId == 'discover'
+          && request.resource.data.keys().hasOnly(
+               ['genres', 'currentPlace', 'recentPlaces', 'updatedAt'])
+          && request.resource.data.genres is list
+          && request.resource.data.genres.size() <= 30
+          && (request.resource.data.currentPlace == null
+              || (request.resource.data.currentPlace is string
+                  && request.resource.data.currentPlace.size() <= 60))
+          && request.resource.data.recentPlaces is list
+          && request.resource.data.recentPlaces.size() <= 5
+          && request.resource.data.updatedAt == request.time;
+      }
     }
 
     // Reading stats: collectionGroup('reads').where('uid', ==, me)

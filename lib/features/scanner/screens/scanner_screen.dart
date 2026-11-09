@@ -6,6 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shelf_snap/core/utils/snackbar.dart';
+import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
+import 'package:shelf_snap/features/discover/models/discover_settings_model.dart';
+import 'package:shelf_snap/features/discover/models/discovered_book_model.dart';
+import 'package:shelf_snap/features/discover/providers/discover_provider.dart';
+import 'package:shelf_snap/features/discover/screens/discovered_screen.dart';
+import 'package:shelf_snap/features/discover/sheets/discover_genres_sheet.dart';
+import 'package:shelf_snap/features/discover/sheets/discover_results_sheet.dart';
+import 'package:shelf_snap/features/discover/sheets/place_sheet.dart';
+import 'package:shelf_snap/features/discover/widgets/discover_scan_bar.dart';
 import 'package:shelf_snap/features/scanner/models/barcode_hit.dart';
 import 'package:shelf_snap/features/scanner/models/scan_mode.dart';
 import 'package:shelf_snap/features/scanner/providers/barcode_session_provider.dart';
@@ -39,6 +49,11 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   // ISBN scanned again, highlighted in the status card for a moment
   String? _duplicateIsbn;
   Timer? _duplicateTimer;
+
+  // Discover photos still being read, and every book found since the
+  // scanner opened, newest scan first, one entry per book
+  int _discoverPending = 0;
+  List<DiscoveredBookModel> _found = const [];
 
   void _showDuplicate(String isbn) {
     _duplicateTimer?.cancel();
@@ -182,7 +197,83 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     }
   }
 
+  // Reads the shelf with /discover and saves every book to Discovered,
+  // tagged with the current place
+  Future<void> _captureDiscover() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    if (controller.value.isTakingPicture) return;
+    if (_discoverPending >= ScanSessionNotifier.maxPending) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    final userId = ref.read(currentUidProvider).valueOrNull;
+    if (userId == null) {
+      messenger.showError('Sign in to use Discover');
+      return;
+    }
+    // Locked at the shutter, so changing the place while this photo is
+    // being read doesn't tag these books with the new one
+    final place = ref.read(discoverSettingsProvider).valueOrNull?.currentPlace;
+
+    setState(() => _discoverPending++);
+    final watch = Stopwatch()..start();
+
+    try {
+      final photo = await controller.takePicture();
+      final books = await ref
+          .read(shelfCaptureServiceProvider)
+          .discover(photo.path, controller.value.previewSize!);
+      debugPrint(
+        '[Discover] Capture done in ${watch.elapsedMilliseconds} ms, '
+        '${books.length} books',
+      );
+
+      // Not awaited: the batch applies locally at once and would hang
+      // offline until the connection comes back
+      if (books.isNotEmpty) {
+        unawaited(
+          ref
+              .read(discoverRepositoryProvider)
+              .saveScan(userId, books, place: place)
+              .catchError((Object e) {
+                debugPrint('saveScan failed: $e');
+                messenger.showError("Couldn't save the books you found");
+              }),
+        );
+      }
+      if (!mounted) return;
+
+      if (books.isEmpty) {
+        HapticFeedback.heavyImpact();
+        messenger.showMessage('No books found. Try again closer to the shelf.');
+        return;
+      }
+      HapticFeedback.mediumImpact();
+      final ids = {for (final b in books) b.id};
+      setState(() {
+        _found = [...books, ..._found.where((b) => !ids.contains(b.id))];
+      });
+    } catch (e) {
+      debugPrint('Discover capture failed: $e');
+      // DiscoverService throws readable messages
+      messenger.showError('$e'.replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _discoverPending--);
+    }
+  }
+
+  void _openDiscovered() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DiscoveredScreen()),
+    );
+  }
+
   void _showResults() {
+    if (_mode == ScanMode.discover) {
+      DiscoverResultsSheet.show(context, books: _found);
+      return;
+    }
     showModalBottomSheet(
       context: context,
       showDragHandle: true,
@@ -212,8 +303,16 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
     final session = ref.watch(scanSessionProvider);
     final hits = ref.watch(barcodeSessionProvider);
     final isShelf = _input == ScanInput.shelf;
-    // Books ready to save, the same ones the results sheet lists
-    final count = isShelf
+    final isDiscover = _mode == ScanMode.discover;
+    // Only watched in Discover mode, so Add mode doesn't read the doc
+    final settings = isDiscover
+        ? ref.watch(discoverSettingsProvider).valueOrNull ??
+              const DiscoverSettingsModel()
+        : null;
+    // The books the results sheet lists
+    final count = isDiscover
+        ? _found.length
+        : isShelf
         ? session.results.length
         : hits.values.where((h) => h.status == HitStatus.found).length;
 
@@ -253,12 +352,31 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 48),
+                      if (isDiscover)
+                        IconButton(
+                          onPressed: _openDiscovered,
+                          tooltip: 'Discovered',
+                          icon: const Icon(Icons.collections_bookmark_outlined),
+                          color: Colors.white,
+                        )
+                      else
+                        const SizedBox(width: 48),
                     ],
                   ),
-                  // Discover isn't built yet: a note instead of the controls
-                  if (_mode == ScanMode.discover)
-                    const Expanded(child: Center(child: _UnderConstruction()))
+                  if (settings != null) ...[
+                    const SizedBox(height: 8),
+                    DiscoverScanBar(
+                      settings: settings,
+                      onGenres: () =>
+                          showDiscoverGenresSheet(context, ref, settings),
+                      onPlace: () =>
+                          PlaceSheet.show(context, settings: settings),
+                    ),
+                  ],
+                  // Discover reads shelf photos with ML Kit, which has no
+                  // web version
+                  if (isDiscover && kIsWeb)
+                    const Expanded(child: Center(child: _DiscoverWebNote()))
                   else ...[
                     // Status card from just below the aim box down to the toggle
                     if (isShelf)
@@ -284,9 +402,13 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
                         const Spacer(),
                         if (isShelf)
                           ShutterButton(
-                            pending: session.pending,
+                            pending: isDiscover
+                                ? _discoverPending
+                                : session.pending,
                             maxPending: ScanSessionNotifier.maxPending,
-                            onPressed: _captureShelf,
+                            onPressed: isDiscover
+                                ? _captureDiscover
+                                : _captureShelf,
                           )
                         else
                           const SizedBox(
@@ -315,9 +437,9 @@ class _ScannerScreenState extends ConsumerState<ScannerScreen> {
   }
 }
 
-// Shown in Discover mode until the feature exists
-class _UnderConstruction extends StatelessWidget {
-  const _UnderConstruction();
+// Shown in Discover mode on the web, where shelf photos can't be read
+class _DiscoverWebNote extends StatelessWidget {
+  const _DiscoverWebNote();
 
   @override
   Widget build(BuildContext context) {
@@ -333,15 +455,20 @@ class _UnderConstruction extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.construction_rounded, size: 40, color: Colors.white),
+          const Icon(
+            Icons.phone_android_rounded,
+            size: 40,
+            color: Colors.white,
+          ),
           const SizedBox(height: 12),
           Text(
-            'Under construction',
+            'Discover needs the Android app',
             style: textTheme.titleMedium?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 4),
           Text(
-            'Point at a shelf to find books you might like. Coming soon.',
+            'Shelf photos can only be read on a phone. Your discovered books '
+            'are still here.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),

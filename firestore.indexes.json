@@ -20,6 +20,44 @@
       "density": "SPARSE_ALL"
     },
     {
+      "collectionGroup": "discovered",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "genres",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "lastSeenAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "discovered",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "places",
+          "arrayConfig": "CONTAINS"
+        },
+        {
+          "fieldPath": "lastSeenAt",
+          "order": "DESCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "DESCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
       "collectionGroup": "loans",
       "queryScope": "COLLECTION",
       "fields": [
