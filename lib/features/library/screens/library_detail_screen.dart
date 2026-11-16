@@ -9,6 +9,7 @@ import 'package:shelf_snap/features/invites/sheets/invite_sheet.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/create_library_screen.dart';
+import 'package:shelf_snap/features/library/sheets/add_book_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/books_tab.dart';
 import 'package:shelf_snap/features/library/widgets/member_avatars.dart';
 import 'package:shelf_snap/features/library/widgets/members_tab.dart';
@@ -83,6 +84,11 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     final userId = AuthService().currentUser?.uid;
     if (userId == null) return;
 
+    if (action == _LibraryAction.addBook) {
+      AddBookSheet.show(context, libraryId: library.id!);
+      return;
+    }
+
     if (action == _LibraryAction.edit) {
       Navigator.push(
         context,
@@ -131,7 +137,9 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     final library = widget.library;
     // Live copy of the library, or the one passed in until it loads
     final live = ref.watch(libraryProvider(library.id!)).valueOrNull ?? library;
-    final isOwner = live.ownerId == AuthService().currentUser?.uid;
+    final uid = AuthService().currentUser?.uid;
+    final isOwner = live.ownerId == uid;
+    final canEdit = live.canEdit(uid);
 
     // Owner's name, once the member profiles have loaded
     final members =
@@ -190,34 +198,35 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                             icon: const Icon(Icons.more_vert_rounded),
                             onSelected: (action) =>
                                 _onAction(action, live, isOwner),
-                            // Owner edits or deletes; members can only leave
-                            itemBuilder: (_) => isOwner
-                                ? const [
-                                    PopupMenuItem(
-                                      value: _LibraryAction.edit,
-                                      child: Text('Edit library'),
-                                    ),
-                                    PopupMenuItem(
-                                      value: _LibraryAction.delete,
-                                      child: Text(
-                                        'Delete library',
-                                        style: TextStyle(
-                                          color: AppColors.error,
-                                        ),
-                                      ),
-                                    ),
-                                  ]
-                                : const [
-                                    PopupMenuItem(
-                                      value: _LibraryAction.leave,
-                                      child: Text(
-                                        'Leave library',
-                                        style: TextStyle(
-                                          color: AppColors.error,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                            // Editors can type a book in; the owner edits or
+                            // deletes; everyone else can only leave
+                            itemBuilder: (_) => [
+                              if (canEdit)
+                                const PopupMenuItem(
+                                  value: _LibraryAction.addBook,
+                                  child: Text('Add a book by hand'),
+                                ),
+                              if (isOwner) ...const [
+                                PopupMenuItem(
+                                  value: _LibraryAction.edit,
+                                  child: Text('Edit library'),
+                                ),
+                                PopupMenuItem(
+                                  value: _LibraryAction.delete,
+                                  child: Text(
+                                    'Delete library',
+                                    style: TextStyle(color: AppColors.error),
+                                  ),
+                                ),
+                              ] else
+                                const PopupMenuItem(
+                                  value: _LibraryAction.leave,
+                                  child: Text(
+                                    'Leave library',
+                                    style: TextStyle(color: AppColors.error),
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                         titleTextStyle: textTheme.headlineSmall?.copyWith(
@@ -306,7 +315,7 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
   }
 }
 
-enum _LibraryAction { edit, delete, leave }
+enum _LibraryAction { addBook, edit, delete, leave }
 
 // Tells NestedScrollView how much of the header stays pinned, which
 // SliverMainAxisGroup doesn't report on its own

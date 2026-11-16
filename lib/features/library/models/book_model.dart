@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:diacritic/diacritic.dart';
 
-/// Which provider the book details came from.
-enum BookSource { google, openlibrary }
+/// Which provider the book details came from; manual = typed in by hand.
+enum BookSource { google, openlibrary, manual }
 
 /// Who can see a book in a library. Private books are only for editors.
 enum BookVisibility { public, private }
