@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -15,6 +16,12 @@ Future<void> main() async {
   // DefaultFirebaseOptions.currentPlatform automatically picks the right config — Android config when running on Android,
   // iOS config on iOS, etc. — from the generated firebase_options.dart
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Keeps the last data on the device, so screens open with it straight
+  // away and update once the server answers. On by default on Android but
+  // off on the web build. Must be set before the first Firestore call.
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+  );
   runApp(ProviderScope(child: MyApp()));
 }
 

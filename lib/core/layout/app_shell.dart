@@ -18,13 +18,23 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int selectedIndex = 0;
 
+  // Tabs opened so far. They stay built, so coming back to one shows it as
+  // it was, with its data already loaded. Unopened tabs load nothing.
+  final _opened = <int>{0};
+
+  void _select(int index) {
+    setState(() {
+      selectedIndex = index;
+      _opened.add(index);
+    });
+  }
+
   late final List<NavItemModel> navItems = [
     NavItemModel(
       // Switches tabs, so the navbar stays on screen
       page: HomeScreen(
-        onOpenLibraries: () => setState(() {
-          selectedIndex = navItems.indexWhere((i) => i.label == 'Library');
-        }),
+        onOpenLibraries: () =>
+            _select(navItems.indexWhere((i) => i.label == 'Library')),
       ),
       icon: Icons.home_outlined,
       activeIcon: Icons.home,
@@ -66,12 +76,16 @@ class _AppShellState extends State<AppShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: navItems[selectedIndex].page,
+      body: IndexedStack(
+        index: selectedIndex,
+        children: [
+          for (var i = 0; i < navItems.length; i++)
+            _opened.contains(i) ? navItems[i].page : const SizedBox.shrink(),
+        ],
+      ),
       bottomNavigationBar: BottomNavbar(
         selectedIndex: selectedIndex,
-        onTap: (index) => setState(() {
-          selectedIndex = index;
-        }),
+        onTap: _select,
         navItems: navItems,
       ),
     );
