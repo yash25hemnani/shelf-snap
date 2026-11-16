@@ -5,8 +5,14 @@ import 'package:shelf_snap/features/library/models/book_model.dart';
 class BookCard extends StatelessWidget {
   final BookModel book;
   final VoidCallback? onTap;
+  final bool owned; // in one of the user's libraries, any edition
 
-  const BookCard({super.key, required this.book, this.onTap});
+  const BookCard({
+    super.key,
+    required this.book,
+    this.onTap,
+    this.owned = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,35 +32,59 @@ class BookCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  coverUrl == null
-                      ? placeholder
-                      : Image.network(
-                          coverUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              placeholder,
-                        ),
-                  // Only editors get private books, so only they see this
-                  if (book.isPrivate)
-                    const Positioned(
-                      top: 6,
-                      right: 6,
-                      child: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: AppColors.text,
-                        child: Icon(
-                          Icons.lock_rounded,
-                          size: 14,
-                          color: AppColors.onPrimary,
+            // Drawn over the cover, so the grid doesn't shift
+            child: Container(
+              foregroundDecoration: owned
+                  ? BoxDecoration(
+                      border: Border.all(color: AppColors.primary, width: 2.5),
+                      borderRadius: BorderRadius.circular(6),
+                    )
+                  : null,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    coverUrl == null
+                        ? placeholder
+                        : Image.network(
+                            coverUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                placeholder,
+                          ),
+                    // Only editors get private books, so only they see this
+                    if (book.isPrivate)
+                      const Positioned(
+                        top: 6,
+                        right: 6,
+                        child: CircleAvatar(
+                          radius: 12,
+                          backgroundColor: AppColors.text,
+                          child: Icon(
+                            Icons.lock_rounded,
+                            size: 14,
+                            color: AppColors.onPrimary,
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                    // The tick means the outline isn't told by colour alone
+                    if (owned)
+                      const Positioned(
+                        left: 6,
+                        bottom: 6,
+                        child: CircleAvatar(
+                          radius: 11,
+                          backgroundColor: AppColors.primary,
+                          child: Icon(
+                            Icons.check_rounded,
+                            size: 14,
+                            color: AppColors.onPrimary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

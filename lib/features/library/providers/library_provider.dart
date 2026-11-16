@@ -76,6 +76,32 @@ final ownedEditionsProvider = StreamProvider.autoDispose
           .watchEditions(args.libraryId, args.readingKey, publicOnly: false),
     );
 
+// Keys from one chunk of search results that the user's own libraries
+// hold. Keyed by the joined keys, since lists don't compare by value.
+final ownedReadingKeysProvider = FutureProvider.autoDispose
+    .family<Set<String>, String>((ref, joinedKeys) async {
+      final uid = ref.watch(currentUidProvider).valueOrNull;
+      if (uid == null || joinedKeys.isEmpty) return {};
+
+      // select() so a bookCount change doesn't run the queries again
+      final ownedIds = ref.watch(
+        userLibrariesProvider(uid).select(
+          (a) => (a.valueOrNull ?? const <LibraryModel>[])
+              .where((l) => l.ownerId == uid && l.id != null)
+              .map((l) => l.id!)
+              .join('|'),
+        ),
+      );
+      if (ownedIds.isEmpty) return {};
+
+      final repo = ref.watch(libraryRepositoryProvider);
+      final keys = joinedKeys.split('|');
+      final sets = await Future.wait([
+        for (final id in ownedIds.split('|')) repo.ownedKeys(id, keys),
+      ]);
+      return {for (final s in sets) ...s};
+    });
+
 // Member profiles of a library, owner first, then by name
 final libraryMembersProvider = StreamProvider.autoDispose
     .family<List<UserModel>, String>((ref, libraryId) {

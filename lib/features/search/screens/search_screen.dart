@@ -1,7 +1,10 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/genre.dart';
+import 'package:shelf_snap/features/library/providers/library_provider.dart';
 import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
 import 'package:shelf_snap/features/library/sheets/genre_picker_sheet.dart';
 import 'package:shelf_snap/features/library/sheets/save_to_library_sheet.dart';
@@ -74,8 +77,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   // The sheet shows its own message, including "already in this library".
   // True once the book is saved.
   Future<bool> _addBook(BookModel book) async {
-    final saved = await SaveToLibrarySheet.show(context, book: book);
-    return saved == true;
+    final saved = await SaveToLibrarySheet.show(context, book: book) == true;
+    // So the new book gets its outline when the user comes back
+    if (saved) ref.invalidate(ownedReadingKeysProvider);
+    return saved;
   }
 
   @override
@@ -135,6 +140,24 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         return const Center(child: Text('No books found'));
                       }
 
+                      // Deduped in result order, so the chunks for earlier
+                      // pages stay the same (and cached) as more load
+                      final keys = {
+                        for (final b in books) ?b.readingKey,
+                      }.toList();
+                      final owned = <String>{};
+                      for (var i = 0; i < keys.length; i += 30) {
+                        final chunk = keys
+                            .sublist(i, min(i + 30, keys.length))
+                            .join('|');
+                        owned.addAll(
+                          ref
+                                  .watch(ownedReadingKeysProvider(chunk))
+                                  .valueOrNull ??
+                              const {},
+                        );
+                      }
+
                       return NotificationListener<ScrollNotification>(
                         onNotification: (notification) {
                           // 300px early so the next page is usually there
@@ -163,6 +186,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                                   final book = books[index];
                                   return BookCard(
                                     book: book,
+                                    owned: owned.contains(book.readingKey),
                                     onTap: () => Navigator.push(
                                       context,
                                       MaterialPageRoute(
