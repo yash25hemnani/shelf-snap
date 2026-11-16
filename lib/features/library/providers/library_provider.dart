@@ -28,6 +28,19 @@ final userLibrariesProvider = StreamProvider.family<List<LibraryModel>, String>(
       ref.watch(libraryRepositoryProvider).watchUserLibraries(userId),
 );
 
+// Libraries the user can add books to: ones they own or edit.
+// Viewers can't save books there, so pickers don't list them.
+final editableLibrariesProvider =
+    Provider.family<AsyncValue<List<LibraryModel>>, String>((ref, userId) {
+      return ref
+          .watch(userLibrariesProvider(userId))
+          .whenData(
+            (libraries) => libraries
+                .where((l) => l.id != null && l.canEdit(userId))
+                .toList(),
+          );
+    });
+
 // True when the signed-in user edits this library; null while it loads.
 // select() so a count change on the library doesn't restart book queries.
 final canEditLibraryProvider = Provider.autoDispose.family<bool?, String>((

@@ -62,7 +62,7 @@ class _BarcodeSheetState extends ConsumerState<BarcodeSheet> {
   @override
   Widget build(BuildContext context) {
     final userId = AuthService().currentUser!.uid;
-    final librariesAsync = ref.watch(userLibrariesProvider(userId));
+    final librariesAsync = ref.watch(editableLibrariesProvider(userId));
 
     // Only books with a match; failed and unmatched scans stay off the sheet
     final foundHits = ref
@@ -90,7 +90,8 @@ class _BarcodeSheetState extends ConsumerState<BarcodeSheet> {
                   data: (libraries) {
                     if (libraries.isEmpty) {
                       return const Text(
-                        'Create a library first to save books.',
+                        'Create a library, or ask an owner to make you an '
+                        'editor, to save books.',
                       );
                     }
                     final libraryId = _pickLibrary(libraries);

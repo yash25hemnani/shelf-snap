@@ -62,7 +62,7 @@ class _ScanResultsSheetState extends ConsumerState<ScanResultsSheet> {
   @override
   Widget build(BuildContext context) {
     final userId = AuthService().currentUser!.uid;
-    final librariesAsync = ref.watch(userLibrariesProvider(userId));
+    final librariesAsync = ref.watch(editableLibrariesProvider(userId));
     final results = ref.watch(scanSessionProvider).results;
 
     return SafeArea(
@@ -84,7 +84,8 @@ class _ScanResultsSheetState extends ConsumerState<ScanResultsSheet> {
                   data: (libraries) {
                     if (libraries.isEmpty) {
                       return const Text(
-                        'Create a library first to save books.',
+                        'Create a library, or ask an owner to make you an '
+                        'editor, to save books.',
                       );
                     }
                     final libraryId = _pickLibrary(libraries);

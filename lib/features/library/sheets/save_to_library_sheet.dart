@@ -59,7 +59,7 @@ class _SaveToLibrarySheetState extends ConsumerState<SaveToLibrarySheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userId = AuthService().currentUser!.uid;
-    final librariesAsync = ref.watch(userLibrariesProvider(userId));
+    final librariesAsync = ref.watch(editableLibrariesProvider(userId));
 
     return SafeArea(
       child: Padding(
@@ -85,7 +85,8 @@ class _SaveToLibrarySheetState extends ConsumerState<SaveToLibrarySheet> {
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 16),
                       child: Text(
-                        'No libraries yet',
+                        'Create a library, or ask an owner to make you an '
+                        'editor, to save books.',
                         textAlign: TextAlign.center,
                       ),
                     )
