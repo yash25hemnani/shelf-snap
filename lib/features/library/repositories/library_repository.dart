@@ -110,6 +110,32 @@ class LibraryRepository {
     return (added: added, copies: copies);
   }
 
+  // One more copy of a book already in the library. Goes by doc id, so it
+  // also works for editions without an ISBN.
+  Future<void> addCopy(String libraryId, String bookId) {
+    final libraryRef = _db.collection('libraries').doc(libraryId);
+    final batch = _db.batch()
+      ..update(libraryRef.collection('books').doc(bookId), {
+        'noOfCopies': FieldValue.increment(1),
+      })
+      ..update(libraryRef, {
+        'bookCount': FieldValue.increment(1),
+        'updatedAt': Timestamp.now(),
+      });
+    return batch.commit();
+  }
+
+  // Which of [keys] this library has, in any edition. At most 30 keys,
+  // Firestore's limit for whereIn.
+  Future<Set<String>> ownedKeys(String libraryId, List<String> keys) async {
+    if (keys.isEmpty) return {};
+    final snap = await _books(
+      libraryId,
+      false,
+    ).where('readingKey', whereIn: keys).get();
+    return {for (final d in snap.docs) d.data()['readingKey'] as String};
+  }
+
   // What to tell the user after a save, e.g. "Saved 3 books, 1 as an
   // extra copy" or "Already in this library, added another copy"
   static String savedMessage(({int added, int copies}) result) {

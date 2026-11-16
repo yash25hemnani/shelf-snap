@@ -42,6 +42,62 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
     if (saved && mounted) setState(() => _added = true);
   }
 
+  // Asks which library when more than one has the book
+  Future<(LibraryModel, BookModel)?> _pickLibrary(
+    List<(LibraryModel, BookModel)> targets,
+  ) {
+    return showModalBottomSheet<(LibraryModel, BookModel)>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
+              child: Text(
+                'Add a copy to',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+            ),
+            for (final t in targets)
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: const Icon(Icons.local_library_outlined),
+                title: Text(t.$1.name),
+                subtitle: Text(
+                  t.$2.noOfCopies == 1
+                      ? '1 copy on the shelf'
+                      : '${t.$2.noOfCopies} copies on the shelf',
+                ),
+                onTap: () => Navigator.pop(context, t),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // One more copy of the edition already in that library. The In your
+  // libraries card shows the new count, so it can be tapped again.
+  Future<void> _addCopy(List<(LibraryModel, BookModel)> targets) async {
+    final target = targets.length == 1
+        ? targets.first
+        : await _pickLibrary(targets);
+    if (target == null || !mounted) return;
+
+    final (library, copy) = target;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(libraryRepositoryProvider).addCopy(library.id!, copy.id!);
+      messenger.showMessage('Added another copy to ${library.name}');
+    } catch (e) {
+      debugPrint('addCopy failed: $e');
+      messenger.showError("Couldn't add the copy, check your connection");
+    }
+  }
+
   // Removes one copy, or the whole book when it's the last copy
   Future<void> _remove() async {
     final book = widget.book;
@@ -255,10 +311,18 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         if (editions.isNotEmpty) owned.add((library, editions));
       }
     }
-    // Saving dedupes by ISBN, so only the same edition becomes a copy
-    final sameEdition =
-        book.isbn != null &&
-        owned.any((o) => o.$2.any((b) => b.isbn == book.isbn));
+    // Where Add another copy goes in each library: this edition if it's on
+    // the shelf, otherwise the first one
+    final targets = [
+      for (final (library, editions) in owned)
+        (
+          library,
+          editions.firstWhere(
+            (b) => book.isbn != null && b.isbn == book.isbn,
+            orElse: () => editions.first,
+          ),
+        ),
+    ];
 
     final muted = textTheme.bodyMedium?.copyWith(
       color: AppColors.textSecondary,
@@ -548,28 +612,48 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: switch (widget.onAdd) {
-        null => null,
-        final onAdd => SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: FilledButton.icon(
-              // Off once saved, so a second tap can't add another copy
-              onPressed: _added ? null : () => _add(onAdd),
-              icon: Icon(_added ? Icons.check_rounded : Icons.add),
-              label: Text(
-                _added
-                    ? 'Added'
-                    : sameEdition
-                    ? 'Add another copy'
-                    : owned.isNotEmpty
-                    ? 'Add this edition'
-                    : 'Add to Library',
+      // No onAdd means the page can't save this edition (a friend's book has
+      // too little data), but a copy of a book you own can still be added
+      bottomNavigationBar: widget.onAdd == null && targets.isEmpty
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Stacked, since side by side each is too narrow for its label
+                    if (targets.isNotEmpty)
+                      FilledButton.icon(
+                        onPressed: () => _addCopy(targets),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add another copy'),
+                      ),
+                    if (widget.onAdd case final onAdd?) ...[
+                      if (targets.isNotEmpty) const SizedBox(height: 8),
+                      // Off once saved, so a second tap can't save it twice
+                      if (targets.isEmpty)
+                        FilledButton.icon(
+                          onPressed: _added ? null : () => _add(onAdd),
+                          icon: Icon(_added ? Icons.check_rounded : Icons.add),
+                          label: Text(_added ? 'Added' : 'Add to Library'),
+                        )
+                      else
+                        OutlinedButton.icon(
+                          onPressed: _added ? null : () => _add(onAdd),
+                          icon: Icon(
+                            _added
+                                ? Icons.check_rounded
+                                : Icons.library_add_outlined,
+                          ),
+                          label: Text(_added ? 'Added' : 'Add this edition'),
+                        ),
+                    ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
-      },
     );
   }
 }
