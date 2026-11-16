@@ -9,9 +9,31 @@ import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/friends/models/friendship_model.dart';
 import 'package:shelf_snap/features/friends/providers/friend_reading_provider.dart';
 import 'package:shelf_snap/features/friends/providers/friendship_provider.dart';
+import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/library/screens/book_detail_screen.dart';
+import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
 import 'package:shelf_snap/features/reading/widgets/reading_log_tile.dart';
 
 enum _FriendAction { unfriend }
+
+// Opens a friend's book like a search result, built from their log since
+// their libraries are hidden. Same title and author give the same
+// readingKey, so it still shows which of your libraries have it.
+void _openBook(BuildContext context, ReadingLogModel log) {
+  Navigator.push(
+    context,
+    MaterialPageRoute(
+      builder: (_) => BookDetailScreen(
+        book: BookModel(
+          title: log.title,
+          authors: log.authors,
+          coverUrl: log.coverUrl,
+          pageCount: log.pageCount,
+        ),
+      ),
+    ),
+  );
+}
 
 // A friend's page: who they are, this year's numbers, what they're
 // reading and what they've finished. Never their ratings, reviews or
@@ -268,7 +290,10 @@ class _CurrentSection extends ConsumerWidget {
               ? const [_Note('Not reading anything right now')]
               : [
                   for (final log in list) ...[
-                    ReadingLogTile(log: log),
+                    ReadingLogTile(
+                      log: log,
+                      onTap: () => _openBook(context, log),
+                    ),
                     const SizedBox(height: 8),
                   ],
                 ],
@@ -317,7 +342,10 @@ class _EndedSection extends ConsumerWidget {
                 ]
               : [
                   for (final log in list) ...[
-                    ReadingLogTile(log: log),
+                    ReadingLogTile(
+                      log: log,
+                      onTap: () => _openBook(context, log),
+                    ),
                     const SizedBox(height: 8),
                   ],
                   // A full page means there may be more
