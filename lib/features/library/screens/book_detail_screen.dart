@@ -16,6 +16,7 @@ import 'package:shelf_snap/features/lending/widgets/book_loans_card.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/sheets/edit_isbn_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/status_dropdown.dart';
 import 'package:shelf_snap/features/library/widgets/wikipedia_card.dart';
 import 'package:shelf_snap/features/reading/models/reading_log_model.dart';
@@ -281,6 +282,8 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         ? null
         : ref.watch(libraryProvider(libraryId)).valueOrNull;
     final canEdit = library?.canEdit(AuthService().currentUser?.uid) ?? false;
+    // A saved copy an editor can change, like adding or fixing its ISBN
+    final canEditCopy = canEdit && bookId != null;
 
     // Books without a title or author have no key, so they can't be tracked
     final readingKey = book.readingKey;
@@ -341,7 +344,8 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         book.publishedDate != null ||
         book.language != null ||
         translatedFrom != null ||
-        book.isbn != null;
+        book.isbn != null ||
+        canEditCopy;
 
     final coverUrl = book.coverUrl;
     const placeholder = ColoredBox(
@@ -504,8 +508,16 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                               label: 'Translated from',
                               value: languageName(translatedFrom),
                             ),
-                          if (book.isbn != null)
-                            _InfoRow(label: 'ISBN', value: book.isbn),
+                          // Editors always see it, so a missing ISBN can be added
+                          if (book.isbn != null || canEditCopy)
+                            _InfoRow(
+                              label: 'ISBN',
+                              value: book.isbn,
+                              placeholder: 'Add',
+                              onTap: canEditCopy
+                                  ? () => EditIsbnSheet.show(context, book)
+                                  : null,
+                            ),
                         ],
                       ),
                     ),

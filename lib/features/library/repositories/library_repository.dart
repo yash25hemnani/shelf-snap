@@ -303,12 +303,35 @@ class LibraryRepository {
     String bookId,
     String? code,
   ) async {
-    final bookRef = _db.collection('libraries')
-                       .doc(libraryId)
-                       .collection('books')
-                       .doc(bookId);
+    final bookRef = _db
+        .collection('libraries')
+        .doc(libraryId)
+        .collection('books')
+        .doc(bookId);
 
     await bookRef.update({'originalLanguage': code});
+  }
+
+  // Adding books merges copies by ISBN, so two books in one library can't
+  // share one. Two results at most: one of them may be this same book.
+  Future<void> updateIsbn(
+    String libraryId,
+    String bookId,
+    String? isbn,
+  ) async {
+    final books = _db
+        .collection('libraries')
+        .doc(libraryId)
+        .collection('books');
+
+    if (isbn != null) {
+      final same = await books.where('isbn', isEqualTo: isbn).limit(2).get();
+      if (same.docs.any((d) => d.id != bookId)) {
+        throw Exception('Another book in this library already has this ISBN');
+      }
+    }
+
+    await books.doc(bookId).update({'isbn': isbn});
   }
 
   // Private books are hidden from viewers; only editors can change this
