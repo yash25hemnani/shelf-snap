@@ -128,6 +128,8 @@ class BookModel {
     'originalLanguage': originalLanguage,
     'visibility': visibility.name,
     'searchTokens': searchTokens,
+    // Same book in any edition; lets the search page find it in libraries
+    'readingKey': readingKey,
   };
 
   /// Only our own fields change; the book facts come from the provider.

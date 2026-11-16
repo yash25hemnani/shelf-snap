@@ -67,6 +67,15 @@ final libraryBookProvider = StreamProvider.autoDispose
           .watchBook(ids.libraryId, ids.bookId),
     );
 
+// Every edition of one book in a library the user owns. Owners see
+// private books too, so there's no visibility filter.
+final ownedEditionsProvider = StreamProvider.autoDispose
+    .family<List<BookModel>, ({String libraryId, String readingKey})>(
+      (ref, args) => ref
+          .watch(libraryRepositoryProvider)
+          .watchEditions(args.libraryId, args.readingKey, publicOnly: false),
+    );
+
 // Member profiles of a library, owner first, then by name
 final libraryMembersProvider = StreamProvider.autoDispose
     .family<List<UserModel>, String>((ref, libraryId) {

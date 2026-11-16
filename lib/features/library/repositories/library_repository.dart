@@ -300,6 +300,30 @@ class LibraryRepository {
   }
 
   // One book, live; null once it's deleted
+  // Every edition of one book in a library, live. Capped because a shelf
+  // rarely holds more than a couple of editions of the same book.
+  Stream<List<BookModel>> watchEditions(
+    String libraryId,
+    String readingKey, {
+    required bool publicOnly,
+  }) {
+    return _books(libraryId, publicOnly)
+        .where('readingKey', isEqualTo: readingKey)
+        .limit(10)
+        .snapshots()
+        .map(
+          (s) => s.docs
+              .map(
+                (d) => BookModel.fromMap(
+                  d.id,
+                  d.data(),
+                ).copyWith(libraryId: libraryId),
+              )
+              .toList(),
+        );
+  }
+
+  // One saved book, live; null once it's deleted
   Stream<BookModel?> watchBook(String libraryId, String bookId) {
     final libraryRef = _db.collection('libraries').doc(libraryId);
 

@@ -232,6 +232,34 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
         ? null
         : ref.watch(readingLogProvider(readingKey)).valueOrNull;
 
+    // Search books only: which libraries the user owns already have this
+    // book, in any edition. A library book already knows where it lives.
+    final uid = AuthService().currentUser?.uid;
+    final owned = <(LibraryModel, List<BookModel>)>[];
+    if (bookId == null && readingKey != null && uid != null) {
+      final libraries =
+          ref.watch(userLibrariesProvider(uid)).valueOrNull ?? const [];
+      for (final library in libraries) {
+        final id = library.id;
+        if (id == null || library.ownerId != uid) continue;
+        final editions =
+            ref
+                .watch(
+                  ownedEditionsProvider((
+                    libraryId: id,
+                    readingKey: readingKey,
+                  )),
+                )
+                .valueOrNull ??
+            const [];
+        if (editions.isNotEmpty) owned.add((library, editions));
+      }
+    }
+    // Saving dedupes by ISBN, so only the same edition becomes a copy
+    final sameEdition =
+        book.isbn != null &&
+        owned.any((o) => o.$2.any((b) => b.isbn == book.isbn));
+
     final muted = textTheme.bodyMedium?.copyWith(
       color: AppColors.textSecondary,
     );
@@ -366,6 +394,11 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
                   ],
                   if (canEdit && libraryId != null && bookId != null) ...[
                     BookLoansCard(libraryId: libraryId, book: book),
+                    const SizedBox(height: 12),
+                  ],
+
+                  if (owned.isNotEmpty) ...[
+                    _InLibrariesCard(owned: owned, isbn: book.isbn),
                     const SizedBox(height: 12),
                   ],
 
@@ -524,11 +557,71 @@ class _BookDetailScreenState extends ConsumerState<BookDetailScreen> {
               // Off once saved, so a second tap can't add another copy
               onPressed: _added ? null : () => _add(onAdd),
               icon: Icon(_added ? Icons.check_rounded : Icons.add),
-              label: Text(_added ? 'Added' : 'Add to Library'),
+              label: Text(
+                _added
+                    ? 'Added'
+                    : sameEdition
+                    ? 'Add another copy'
+                    : owned.isNotEmpty
+                    ? 'Add this edition'
+                    : 'Add to Library',
+              ),
             ),
           ),
         ),
       },
+    );
+  }
+}
+
+// Libraries that already have this book; a row opens that library's copy,
+// the same edition when there is one
+class _InLibrariesCard extends StatelessWidget {
+  final List<(LibraryModel, List<BookModel>)> owned;
+  final String? isbn;
+
+  const _InLibrariesCard({required this.owned, required this.isbn});
+
+  // "2 copies" or "1 copy · different edition"
+  String _copiesLine(List<BookModel> editions) {
+    final copies = editions.fold(0, (sum, b) => sum + b.noOfCopies);
+    final text = copies == 1 ? '1 copy' : '$copies copies';
+    final same = isbn != null && editions.any((b) => b.isbn == isbn);
+    return same ? text : '$text · different edition';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = Theme.of(
+      context,
+    ).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary);
+
+    return SectionCard(
+      icon: Icons.local_library_outlined,
+      title: 'In your libraries',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final (library, editions) in owned)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(library.name),
+              subtitle: Text(_copiesLine(editions), style: muted),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => BookDetailScreen(
+                    book: editions.firstWhere(
+                      (b) => isbn != null && b.isbn == isbn,
+                      orElse: () => editions.first,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
