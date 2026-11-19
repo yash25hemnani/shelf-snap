@@ -7,24 +7,58 @@ class LibraryRepository {
   final _db = FirebaseFirestore.instance;
 
   // Create a library, returning its generated id
+  DocumentReference<Map<String, dynamic>> _handleDoc(String handle) =>
+      _db.collection('libraryHandles').doc(handle);
+
+  // Creates the library, and reserves its handle in the same batch so two
+  // libraries can't end up with one web address
   Future<String> createLibrary(LibraryModel library) async {
     final data = library.toMap();
     // Ensure owner in members
     data["members"] = {...library.members, library.ownerId}.toList();
     data["editors"] = {library.ownerId}.toList();
-    final doc = await _db.collection("libraries").add(data);
-    return doc.id;
+
+    final ref = _db.collection("libraries").doc();
+    final batch = _db.batch()..set(ref, data);
+    if (library.handle != null) {
+      batch.set(_handleDoc(library.handle!), {
+        'libraryId': ref.id,
+        'ownerId': library.ownerId,
+      });
+    }
+    await batch.commit();
+    return ref.id;
   }
 
-  // Only the fields the edit form changes, so counts and members are untouched
-  Future<void> updateLibrary(LibraryModel library) {
-    return _db.collection('libraries').doc(library.id).update({
-      'name': library.name,
-      'description': library.description,
-      'banner': library.banner,
-      'access': library.access.name,
-      'updatedAt': Timestamp.now(),
-    });
+  // Only the fields the edit form changes, so counts and members are untouched.
+  // A new handle swaps the reservation: old one freed, new one taken.
+  Future<void> updateLibrary(LibraryModel library, {String? oldHandle}) {
+    final batch = _db.batch()
+      ..update(_db.collection('libraries').doc(library.id), {
+        'name': library.name,
+        'description': library.description,
+        'banner': library.banner,
+        'access': library.access.name,
+        'handle': library.handle,
+        'updatedAt': Timestamp.now(),
+      });
+
+    if (library.handle != oldHandle) {
+      if (oldHandle != null) batch.delete(_handleDoc(oldHandle));
+      if (library.handle != null) {
+        batch.set(_handleDoc(library.handle!), {
+          'libraryId': library.id,
+          'ownerId': library.ownerId,
+        });
+      }
+    }
+    return batch.commit();
+  }
+
+  // True when another library already uses this handle
+  Future<bool> isHandleTaken(String handle, {String? libraryId}) async {
+    final snap = await _handleDoc(handle).get();
+    return snap.exists && snap.data()?['libraryId'] != libraryId;
   }
 
   // Most recently active public libraries. Capped, since anyone can list
@@ -234,22 +268,28 @@ class LibraryRepository {
 
   // Deletes every book in the library, then the library itself.
   // Books go first because their rules check the library's members.
-  Future<void> deleteLibrary(String libraryId) async {
+  // [handle] is freed along with the library
+  Future<void> deleteLibrary(String libraryId, {String? handle}) async {
     final libraryRef = _db.collection('libraries').doc(libraryId);
 
-    // A batch holds at most 500 writes
-    while (true) {
-      final page = await libraryRef.collection('books').limit(400).get();
-      if (page.docs.isEmpty) break;
+    // A batch holds at most 500 writes. Join requests go too, or they'd
+    // stay in the owner's notifications after the library is gone.
+    for (final sub in ['books', 'joinRequests']) {
+      while (true) {
+        final page = await libraryRef.collection(sub).limit(400).get();
+        if (page.docs.isEmpty) break;
 
-      final batch = _db.batch();
-      for (final doc in page.docs) {
-        batch.delete(doc.reference);
+        final batch = _db.batch();
+        for (final doc in page.docs) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
       }
-      await batch.commit();
     }
 
-    await libraryRef.delete();
+    final batch = _db.batch()..delete(libraryRef);
+    if (handle != null) batch.delete(_handleDoc(handle));
+    await batch.commit();
   }
 
   // Remove one copy of a book, deleting the doc when it was the last copy

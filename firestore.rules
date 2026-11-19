@@ -6,6 +6,10 @@ service cloud.firestore {
     function uid() { return request.auth.uid; }
     function changed() { return request.resource.data.diff(resource.data).affectedKeys(); }
 
+    function handlePath(h) {
+      return /databases/$(database)/documents/libraryHandles/$(h);
+    }
+
     function libraryData(libId) {
       return get(/databases/$(database)/documents/libraries/$(libId)).data;
     }
@@ -130,6 +134,16 @@ service cloud.firestore {
         return /databases/$(database)/documents/invites/$(libId + '_' + u);
       }
 
+      // A handle on the library must be reserved for this library in the
+      // same batch; a replaced handle must be freed in that batch too
+      function handleOk() {
+        let before = resource == null ? null : resource.data.get('handle', null);
+        let after = request.resource.data.get('handle', null);
+        return before == after || (
+          (after == null || getAfter(handlePath(after)).data.libraryId == libId)
+          && (before == null || !existsAfter(handlePath(before))));
+      }
+
       // resource == null: a deleted library reads as missing instead of failing.
       // Member check first: old libraries have no access field. Listing public
       // libraries works because that query filters on access == 'public'.
@@ -143,7 +157,8 @@ service cloud.firestore {
         && request.resource.data.editors == [uid()]
         && request.resource.data.bookCount == 0
         && request.resource.data.uniqueCount == 0
-        && request.resource.data.get('access', 'private') in ['private', 'public'];
+        && request.resource.data.get('access', 'private') in ['private', 'public']
+        && handleOk();
 
       allow update: if signedIn() && (
         // Owner: anything except ownership, and can't drop themselves.
@@ -151,7 +166,8 @@ service cloud.firestore {
         (uid() == resource.data.ownerId
           && request.resource.data.ownerId == resource.data.ownerId
           && uid() in request.resource.data.members
-          && request.resource.data.get('access', 'private') in ['private', 'public'])
+          && request.resource.data.get('access', 'private') in ['private', 'public']
+          && handleOk())
 
         // Editors: only the counts, when adding or removing books
         || (isEditorOf(resource.data)
@@ -228,8 +244,11 @@ service cloud.firestore {
 
         // The requester cancels; the owner declines, or approves (in the
         // same batch that adds them to members)
+        // ownerId on the request first, so leftovers from a deleted
+        // library can still be cleared
         allow delete: if signedIn()
-          && (uid() == reqUid || uid() == libraryData(libId).ownerId);
+          && (uid() == reqUid || resource.data.ownerId == uid()
+              || uid() == libraryData(libId).ownerId);
       }
     }
 
@@ -237,6 +256,24 @@ service cloud.firestore {
     //   .where('ownerId', ==, me)
     match /{path=**}/joinRequests/{reqUid} {
       allow read: if signedIn() && resource.data.ownerId == uid();
+    }
+
+    // ---------- Library handles ----------
+    // One doc per web address ({handle} in /l/{handle}), so a handle can
+    // only belong to one library. Created in the batch that sets it on
+    // the library; the wrapper reads these through the Admin SDK.
+    match /libraryHandles/{handle} {
+      allow get: if signedIn();   // availability check; no listing
+
+      allow create: if signedIn()
+        && handle.matches('^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$')
+        && !(handle in ['admin', 'api', 'app', 'about', 'help', 'login', 'privacy', 'terms'])
+        && request.resource.data.keys().hasOnly(['libraryId', 'ownerId'])
+        && request.resource.data.ownerId == uid()
+        && getAfter(/databases/$(database)/documents/libraries/$(request.resource.data.libraryId)).data.ownerId == uid()
+        && getAfter(/databases/$(database)/documents/libraries/$(request.resource.data.libraryId)).data.get('handle', null) == handle;
+
+      allow delete: if signedIn() && resource.data.ownerId == uid();
     }
 
     // ---------- Invites ----------

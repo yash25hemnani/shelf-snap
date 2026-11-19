@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:diacritic/diacritic.dart';
 import 'package:flutter/painting.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 
@@ -18,6 +19,8 @@ class LibraryModel {
   final List<String> editors; // can edit copies; always inside members
   final String banner; // key in AppColors.libraryBanners
   final LibraryAccess access;
+  // Web address name, the {handle} in /l/{handle}; reserved in libraryHandles
+  final String? handle;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -33,6 +36,7 @@ class LibraryModel {
     this.editors = const [],
     this.banner = AppColors.defaultBanner,
     this.access = LibraryAccess.private,
+    this.handle,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -48,6 +52,7 @@ class LibraryModel {
     'editors': editors,
     'banner': banner,
     'access': access.name,
+    'handle': handle,
     'createdAt': Timestamp.fromDate(createdAt),
     'updatedAt': Timestamp.fromDate(updatedAt),
   };
@@ -72,12 +77,40 @@ class LibraryModel {
       access:
           LibraryAccess.values.asNameMap()[map['access']] ??
           LibraryAccess.private,
+      handle: map['handle'],
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
     );
   }
 
   bool get isPublic => access == LibraryAccess.public;
+
+  // Owner first, then editors; the people who run the library
+  List<String> get runBy => {ownerId, ...editors}.toList();
+
+  // Rules accept 3-30 lowercase letters, digits and inner hyphens
+  static final handlePattern = RegExp(r'^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$');
+
+  // Words kept for the web catalog's own pages
+  static const reservedHandles = {
+    'admin',
+    'api',
+    'app',
+    'about',
+    'help',
+    'login',
+    'privacy',
+    'terms',
+  };
+
+  // Suggested handle from a library name: "Café Books!" -> "cafe-books"
+  static String slugify(String name) {
+    final slug = removeDiacritics(
+      name.toLowerCase(),
+    ).replaceAll(RegExp(r'[^a-z0-9]+'), '-').replaceAll(RegExp(r'^-+|-+$'), '');
+    final capped = slug.length > 30 ? slug.substring(0, 30) : slug;
+    return capped.replaceAll(RegExp(r'-+$'), '');
+  }
 
   ImageProvider get bannerImage =>
       AssetImage(AppColors.libraryBanners[banner]!);
