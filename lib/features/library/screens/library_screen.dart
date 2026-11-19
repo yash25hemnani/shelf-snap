@@ -22,10 +22,57 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   final _searchController = TextEditingController();
   String _query = '';
 
-  void _createLibrary(String userId) {
+  void _createLibrary(String userId, LibraryAccess access) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => CreateLibraryScreen(userId: userId)),
+      MaterialPageRoute(
+        builder: (_) =>
+            CreateLibraryScreen(userId: userId, initialAccess: access),
+      ),
+    );
+  }
+
+  void _openLibrary(LibraryModel library) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LibraryDetailScreen(library: library)),
+    );
+  }
+
+  // One tab: the user's own libraries, the New library row, then on the
+  // Public tab other public libraries they aren't in
+  Widget _buildList(
+    List<LibraryModel> mine,
+    String userId,
+    LibraryAccess access, {
+    List<LibraryModel> others = const [],
+  }) {
+    if (mine.isEmpty && others.isEmpty && _query.isNotEmpty) {
+      return const Center(child: Text('No libraries match your search'));
+    }
+
+    return ListView(
+      // Extra bottom space so the last card clears the navbar
+      padding: const EdgeInsets.only(top: 4, bottom: 32),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      children: [
+        for (final library in mine)
+          LibraryCard(library: library, onTap: () => _openLibrary(library)),
+        // Hidden while searching
+        if (_query.isEmpty)
+          _NewLibraryRow(onTap: () => _createLibrary(userId, access)),
+        if (others.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+            child: Text(
+              'More public libraries',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          for (final library in others)
+            LibraryCard(library: library, onTap: () => _openLibrary(library)),
+        ],
+      ],
     );
   }
 
@@ -47,94 +94,94 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final librariesAsync = ref.watch(userLibrariesProvider(userId));
     final inviteCount =
         ref.watch(incomingInvitesProvider(userId)).valueOrNull?.length ?? 0;
+    // Public libraries the user isn't in yet; capped at 20 by the query
+    final otherPublic =
+        (ref.watch(publicLibrariesProvider).valueOrNull ?? const [])
+            .where((l) => !l.members.contains(userId) && _matches(l))
+            .toList();
 
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 64,
-        titleTextStyle: Theme.of(context).textTheme.headlineMedium,
-        title: const Text("Libraries"),
-        actions: [
-          IconButton(
-            tooltip: 'Notifications',
-            // The badge shows the number of pending invites
-            icon: Badge.count(
-              count: inviteCount,
-              isLabelVisible: inviteCount > 0,
-              child: const Icon(Icons.notifications_none_rounded),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          toolbarHeight: 64,
+          titleTextStyle: Theme.of(context).textTheme.headlineMedium,
+          title: const Text("Libraries"),
+          actions: [
+            IconButton(
+              tooltip: 'Notifications',
+              // The badge shows the number of pending invites
+              icon: Badge.count(
+                count: inviteCount,
+                isLabelVisible: inviteCount > 0,
+                child: const Icon(Icons.notifications_none_rounded),
+              ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+              ),
             ),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-            ),
+          ],
+          // Private first: every library made before this was private
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Private'),
+              Tab(text: 'Public'),
+            ],
           ),
-        ],
-      ),
-      body: librariesAsync.when(
-        data: (items) {
-          final visible = items.where(_matches).toList();
+        ),
+        body: librariesAsync.when(
+          data: (items) {
+            final visible = items.where(_matches).toList();
 
-          return Column(
-            children: [
-              Container(
-                color: AppColors.background,
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (text) => setState(() => _query = text),
-                  autocorrect: false,
-                  textInputAction: TextInputAction.search,
-                  decoration: InputDecoration(
-                    hintText: 'Search libraries',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() => _query = '');
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
+            return Column(
+              children: [
+                Container(
+                  color: AppColors.background,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: (text) => setState(() => _query = text),
+                    autocorrect: false,
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: 'Search libraries',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _query.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: visible.isEmpty && _query.isNotEmpty
-                    ? const Center(
-                        child: Text('No libraries match your search'),
-                      )
-                    : ListView.builder(
-                        // Extra bottom space so the last card clears the navbar
-                        padding: const EdgeInsets.only(bottom: 32),
-                        keyboardDismissBehavior:
-                            ScrollViewKeyboardDismissBehavior.onDrag,
-                        // The New library row is last, hidden while searching
-                        itemCount: visible.length + (_query.isEmpty ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == visible.length) {
-                            return _NewLibraryRow(
-                              onTap: () => _createLibrary(userId),
-                            );
-                          }
-                          final library = visible[index];
-                          return LibraryCard(
-                            library: library,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    LibraryDetailScreen(library: library),
-                              ),
-                            ),
-                          );
-                        },
+                Expanded(
+                  child: TabBarView(
+                    children: [
+                      _buildList(
+                        visible.where((l) => !l.isPublic).toList(),
+                        userId,
+                        LibraryAccess.private,
                       ),
-              ),
-            ],
-          );
-        },
-        error: (err, stack) => Center(child: Text("Error: $err")),
-        loading: () => const Center(child: CircularProgressIndicator()),
+                      _buildList(
+                        visible.where((l) => l.isPublic).toList(),
+                        userId,
+                        LibraryAccess.public,
+                        others: otherPublic,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+          error: (err, stack) => Center(child: Text("Error: $err")),
+          loading: () => const Center(child: CircularProgressIndicator()),
+        ),
       ),
     );
   }

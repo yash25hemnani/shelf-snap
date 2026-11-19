@@ -140,6 +140,8 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     final uid = AuthService().currentUser?.uid;
     final isOwner = live.ownerId == uid;
     final canEdit = live.canEdit(uid);
+    // False for someone looking at a public library they aren't in
+    final isMember = live.members.contains(uid);
 
     // Owner's name, once the member profiles have loaded
     final members =
@@ -192,42 +194,44 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                         ),
                         // Title sits right after the back arrow
                         titleSpacing: 0,
+                        // Visitors have nothing to edit or leave
                         actions: [
-                          PopupMenuButton<_LibraryAction>(
-                            tooltip: 'Library options',
-                            icon: const Icon(Icons.more_vert_rounded),
-                            onSelected: (action) =>
-                                _onAction(action, live, isOwner),
-                            // Editors can type a book in; the owner edits or
-                            // deletes; everyone else can only leave
-                            itemBuilder: (_) => [
-                              if (canEdit)
-                                const PopupMenuItem(
-                                  value: _LibraryAction.addBook,
-                                  child: Text('Add a book by hand'),
-                                ),
-                              if (isOwner) ...const [
-                                PopupMenuItem(
-                                  value: _LibraryAction.edit,
-                                  child: Text('Edit library'),
-                                ),
-                                PopupMenuItem(
-                                  value: _LibraryAction.delete,
-                                  child: Text(
-                                    'Delete library',
-                                    style: TextStyle(color: AppColors.error),
+                          if (isMember)
+                            PopupMenuButton<_LibraryAction>(
+                              tooltip: 'Library options',
+                              icon: const Icon(Icons.more_vert_rounded),
+                              onSelected: (action) =>
+                                  _onAction(action, live, isOwner),
+                              // Editors can type a book in; the owner edits or
+                              // deletes; everyone else can only leave
+                              itemBuilder: (_) => [
+                                if (canEdit)
+                                  const PopupMenuItem(
+                                    value: _LibraryAction.addBook,
+                                    child: Text('Add a book by hand'),
                                   ),
-                                ),
-                              ] else
-                                const PopupMenuItem(
-                                  value: _LibraryAction.leave,
-                                  child: Text(
-                                    'Leave library',
-                                    style: TextStyle(color: AppColors.error),
+                                if (isOwner) ...const [
+                                  PopupMenuItem(
+                                    value: _LibraryAction.edit,
+                                    child: Text('Edit library'),
                                   ),
-                                ),
-                            ],
-                          ),
+                                  PopupMenuItem(
+                                    value: _LibraryAction.delete,
+                                    child: Text(
+                                      'Delete library',
+                                      style: TextStyle(color: AppColors.error),
+                                    ),
+                                  ),
+                                ] else
+                                  const PopupMenuItem(
+                                    value: _LibraryAction.leave,
+                                    child: Text(
+                                      'Leave library',
+                                      style: TextStyle(color: AppColors.error),
+                                    ),
+                                  ),
+                              ],
+                            ),
                         ],
                         titleTextStyle: textTheme.headlineSmall?.copyWith(
                           fontSize: 20,
