@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/join_request.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 
 class LibraryRepository {
@@ -286,6 +287,82 @@ class LibraryRepository {
       'editors': FieldValue.arrayRemove([uid]),
       'updatedAt': Timestamp.now(),
     });
+  }
+
+  CollectionReference<Map<String, dynamic>> _joinRequests(String libraryId) =>
+      _db.collection('libraries').doc(libraryId).collection('joinRequests');
+
+  // Asks the owner of a public library to let this user in. The doc id is
+  // the uid, so asking twice can't make two requests.
+  Future<void> requestToJoin(
+    LibraryModel library,
+    String uid,
+    String username,
+  ) {
+    final request = JoinRequest(
+      uid: uid,
+      libraryId: library.id!,
+      username: username,
+      ownerId: library.ownerId,
+      libraryName: library.name,
+      createdAt: DateTime.now(),
+    );
+    return _joinRequests(library.id!).doc(uid).set({
+      ...request.toMap(),
+      // Must equal request.time in the rules
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // The requester cancelling, or the owner declining
+  Future<void> deleteJoinRequest(String libraryId, String uid) =>
+      _joinRequests(libraryId).doc(uid).delete();
+
+  // True while this user has a request waiting on the library
+  Stream<bool> watchHasRequested(String libraryId, String uid) =>
+      _joinRequests(libraryId).doc(uid).snapshots().map((snap) => snap.exists);
+
+  // Requests waiting on one library, oldest first. Capped, since the owner
+  // works through them and they don't pile up.
+  Stream<List<JoinRequest>> watchJoinRequests(
+    String libraryId, {
+    int limit = 50,
+  }) {
+    return _joinRequests(libraryId)
+        .orderBy('createdAt')
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map(JoinRequest.fromDoc).toList());
+  }
+
+  // Requests waiting on every library this user owns, oldest first. No
+  // orderBy, so a single-field index is enough; sorted here instead.
+  Stream<List<JoinRequest>> watchOwnerJoinRequests(
+    String ownerId, {
+    int limit = 50,
+  }) {
+    return _db
+        .collectionGroup('joinRequests')
+        .where('ownerId', isEqualTo: ownerId)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) =>
+              snap.docs.map(JoinRequest.fromDoc).toList()
+                ..sort((a, b) => a.createdAt.compareTo(b.createdAt)),
+        );
+  }
+
+  // Adds the requester as a member and clears the request in one batch,
+  // so nobody is left a member with a request still waiting
+  Future<void> approveJoinRequest(String libraryId, String uid) {
+    final batch = _db.batch()
+      ..update(_db.collection('libraries').doc(libraryId), {
+        'members': FieldValue.arrayUnion([uid]),
+        'updatedAt': Timestamp.now(),
+      })
+      ..delete(_joinRequests(libraryId).doc(uid));
+    return batch.commit();
   }
 
   //

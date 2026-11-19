@@ -13,6 +13,7 @@ import 'package:shelf_snap/features/library/sheets/add_book_sheet.dart';
 import 'package:shelf_snap/features/library/widgets/books_tab.dart';
 import 'package:shelf_snap/features/library/widgets/member_avatars.dart';
 import 'package:shelf_snap/features/library/widgets/members_tab.dart';
+import 'package:shelf_snap/features/profile/providers/user_provider.dart';
 
 class LibraryDetailScreen extends ConsumerStatefulWidget {
   final LibraryModel library;
@@ -283,7 +284,10 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                                         ),
                                         textStyle: textTheme.labelLarge,
                                       ),
-                                    ),
+                                    )
+                                  // Visitors to a public library can ask in
+                                  else if (!isMember && live.isPublic)
+                                    _JoinButton(library: live),
                                 ],
                               ),
                               const SizedBox(height: 12),
@@ -320,6 +324,109 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
 }
 
 enum _LibraryAction { addBook, edit, delete, leave }
+
+// Request to join a public library, or cancel a request that's waiting.
+// Becomes the member view once the owner approves.
+class _JoinButton extends ConsumerStatefulWidget {
+  final LibraryModel library;
+
+  const _JoinButton({required this.library});
+
+  @override
+  ConsumerState<_JoinButton> createState() => _JoinButtonState();
+}
+
+class _JoinButtonState extends ConsumerState<_JoinButton> {
+  bool _busy = false; // true while the request or cancel is in flight
+
+  Future<void> _request() async {
+    final uid = AuthService().currentUser?.uid;
+    final username = uid == null
+        ? null
+        : ref.read(userProfileProvider(uid)).valueOrNull?.username;
+    final messenger = ScaffoldMessenger.of(context);
+    // Rules check the username against the profile, so wait for it
+    if (uid == null || username == null || username.isEmpty) {
+      messenger.showError('Set a username before asking to join');
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(libraryRepositoryProvider)
+          .requestToJoin(widget.library, uid, username);
+      messenger.showMessage('Request sent to the owner');
+    } catch (e) {
+      debugPrint('Request to join failed: $e');
+      messenger.showError("Couldn't send request");
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  Future<void> _cancel() async {
+    final uid = AuthService().currentUser?.uid;
+    if (uid == null) return;
+
+    final confirmed = await showConfirmDialog(
+      context,
+      icon: Icons.close_rounded,
+      title: 'Cancel request?',
+      message: "The owner won't see your request to join anymore.",
+      confirmLabel: 'Cancel request',
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _busy = true);
+    try {
+      await ref
+          .read(libraryRepositoryProvider)
+          .deleteJoinRequest(widget.library.id!, uid);
+      messenger.showMessage('Request cancelled');
+    } catch (e) {
+      debugPrint('Cancel join request failed: $e');
+      messenger.showError("Couldn't cancel request");
+    }
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final requested = ref.watch(hasRequestedToJoinProvider(widget.library.id!));
+    // Watched so the username is loaded by the time the button is tapped
+    final uid = AuthService().currentUser?.uid;
+    if (uid != null) ref.watch(userProfileProvider(uid));
+    final textTheme = Theme.of(context).textTheme;
+    final style = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 14),
+      ),
+      textStyle: WidgetStatePropertyAll(textTheme.labelLarge),
+    );
+
+    // Nothing until we know, so the button doesn't flip on open
+    if (!requested.hasValue) return const SizedBox.shrink();
+
+    if (requested.value!) {
+      return OutlinedButton.icon(
+        onPressed: _busy ? null : _cancel,
+        icon: const Icon(Icons.schedule_rounded, size: 18),
+        label: const Text('Requested'),
+        style: style,
+      );
+    }
+
+    return FilledButton.icon(
+      onPressed: _busy ? null : _request,
+      icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+      label: const Text('Request to join'),
+      style: style,
+    );
+  }
+}
 
 // Tells NestedScrollView how much of the header stays pinned, which
 // SliverMainAxisGroup doesn't report on its own

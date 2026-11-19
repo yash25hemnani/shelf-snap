@@ -3,6 +3,7 @@ import 'package:shelf_snap/features/auth/providers/auth_provider.dart';
 import 'package:shelf_snap/features/library/repositories/library_repository.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/models/book_model.dart';
+import 'package:shelf_snap/features/library/models/join_request.dart';
 import 'package:shelf_snap/features/profile/models/user_model.dart';
 import 'package:shelf_snap/features/profile/providers/user_provider.dart';
 
@@ -138,6 +139,41 @@ final libraryMembersProvider = StreamProvider.autoDispose
               }),
           );
     });
+
+// True while the signed-in user has asked to join this library
+final hasRequestedToJoinProvider = StreamProvider.autoDispose
+    .family<bool, String>((ref, libraryId) {
+      final uid = ref.watch(currentUidProvider).valueOrNull;
+      if (uid == null) return Stream.value(false);
+
+      return ref
+          .watch(libraryRepositoryProvider)
+          .watchHasRequested(libraryId, uid);
+    });
+
+// Requests waiting on one library. Only the owner can read them, so
+// everyone else gets an empty list without a query.
+final joinRequestsProvider = StreamProvider.autoDispose
+    .family<List<JoinRequest>, String>((ref, libraryId) {
+      final uid = ref.watch(currentUidProvider).valueOrNull;
+      final ownerId = ref.watch(
+        libraryProvider(libraryId).select((a) => a.valueOrNull?.ownerId),
+      );
+      if (uid == null || ownerId != uid) return Stream.value(const []);
+
+      return ref.watch(libraryRepositoryProvider).watchJoinRequests(libraryId);
+    });
+
+// Requests waiting on every library the signed-in user owns, for
+// Notifications and the bell's badge
+final ownerJoinRequestsProvider = StreamProvider.autoDispose<List<JoinRequest>>(
+  (ref) {
+    final uid = ref.watch(currentUidProvider).valueOrNull;
+    if (uid == null) return Stream.value(const []);
+
+    return ref.watch(libraryRepositoryProvider).watchOwnerJoinRequests(uid);
+  },
+);
 
 // Books in one library matching every word of [query]; for search boxes
 // that keep their own text, like the lend sheet
