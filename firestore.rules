@@ -204,6 +204,39 @@ service cloud.firestore {
               || (resource.data.get('noOfCopies', 1) == 1
                   && resource.data.get('lentCount', 0) == 1));
       }
+
+      // Asking to join a public library. The doc id is the requester's
+      // uid, so there's one request per person per library.
+      match /joinRequests/{reqUid} {
+        allow read: if signedIn()
+          && (uid() == reqUid || uid() == libraryData(libId).ownerId);
+
+        // Only for a public library you aren't in yet. The username must
+        // match the profile, so nobody can ask under someone else's name.
+        allow create: if signedIn()
+          && uid() == reqUid
+          && libraryData(libId).get('access', 'private') == 'public'
+          && !(uid() in libraryData(libId).members)
+          && request.resource.data.keys().hasOnly(
+               ['uid', 'username', 'ownerId', 'libraryName', 'createdAt'])
+          && request.resource.data.uid == uid()
+          && request.resource.data.ownerId == libraryData(libId).ownerId
+          && request.resource.data.libraryName is string
+          && request.resource.data.username
+               == get(/databases/$(database)/documents/users/$(uid())).data.username
+          && request.resource.data.createdAt == request.time;
+
+        // The requester cancels; the owner declines, or approves (in the
+        // same batch that adds them to members)
+        allow delete: if signedIn()
+          && (uid() == reqUid || uid() == libraryData(libId).ownerId);
+      }
+    }
+
+    // Owner's notifications: collectionGroup('joinRequests')
+    //   .where('ownerId', ==, me)
+    match /{path=**}/joinRequests/{reqUid} {
+      allow read: if signedIn() && resource.data.ownerId == uid();
     }
 
     // ---------- Invites ----------
