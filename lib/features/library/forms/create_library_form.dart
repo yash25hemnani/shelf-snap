@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
@@ -25,6 +26,12 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
 
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
+  final _handleController = TextEditingController();
+
+  // False until the user types a handle; until then it follows the name
+  bool _handleEdited = false;
+  // Set when the handle turns out to be taken, shown under the field
+  String? _handleError;
 
   // True while the save is in progress; disables the button
   bool _isSaving = false;
@@ -45,17 +52,39 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
       _nameController.text = library.name;
       _descController.text = library.description ?? '';
       _banner = library.banner;
+      _handleController.text = library.handle ?? '';
+      _handleEdited = library.handle != null;
     }
+  }
+
+  // Keeps a suggested handle in step with the name until the user edits it
+  void _onNameChanged(String name) {
+    if (_handleEdited) return;
+    _handleController.text = LibraryModel.slugify(name);
+  }
+
+  String? _validateHandle(String? value) {
+    final handle = value?.trim() ?? '';
+    if (handle.isEmpty) return null; // optional
+    if (!LibraryModel.handlePattern.hasMatch(handle)) {
+      return '3-30 lowercase letters, numbers or hyphens';
+    }
+    if (LibraryModel.reservedHandles.contains(handle)) {
+      return 'That one is reserved, try another';
+    }
+    return null;
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _descController.dispose();
+    _handleController.dispose();
     super.dispose();
   }
 
   Future<void> _onSubmit() async {
+    setState(() => _handleError = null);
     if (!_formKey.currentState!.validate()) return;
 
     final repository = ref.read(libraryRepositoryProvider);
@@ -65,6 +94,12 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
     final name = _nameController.text.trim();
     final desc = _descController.text.trim();
     final now = DateTime.now();
+    final oldHandle = widget.library?.handle;
+    final typed = _handleController.text.trim();
+    // Private libraries keep any handle they had, for when they go public
+    final handle = _access == LibraryAccess.public
+        ? (typed.isEmpty ? null : typed)
+        : oldHandle;
 
     final library = LibraryModel(
       name: name,
@@ -72,6 +107,7 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
       ownerId: widget.userId,
       banner: _banner,
       access: _access,
+      handle: handle,
       createdAt: now,
       updatedAt: now,
     );
@@ -79,6 +115,21 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
     setState(() => _isSaving = true);
 
     try {
+      // Checked here so the field can say so; the rules still stop a race
+      if (handle != null &&
+          handle != oldHandle &&
+          await repository.isHandleTaken(
+            handle,
+            libraryId: widget.library?.id,
+          )) {
+        if (!mounted) return;
+        setState(() {
+          _isSaving = false;
+          _handleError = 'Another library already uses this';
+        });
+        return;
+      }
+
       if (_isEditing) {
         await repository.updateLibrary(
           LibraryModel(
@@ -88,9 +139,11 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
             ownerId: widget.library!.ownerId,
             banner: _banner,
             access: _access,
+            handle: handle,
             createdAt: widget.library!.createdAt,
             updatedAt: DateTime.now(),
           ),
+          oldHandle: oldHandle,
         );
       } else {
         await repository.createLibrary(library);
@@ -173,6 +226,7 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
                     controller: _nameController,
                     textCapitalization: TextCapitalization.words,
                     textInputAction: TextInputAction.next,
+                    onChanged: _onNameChanged,
                     decoration: const InputDecoration(
                       hintText: 'e.g. Book Buddies',
                     ),
@@ -226,6 +280,39 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
                       color: AppColors.textSecondary,
                     ),
                   ),
+
+                  // Only public libraries get a web page
+                  if (_access == LibraryAccess.public) ...[
+                    const SizedBox(height: 20),
+                    const _FieldLabel('Web address (optional)'),
+                    TextFormField(
+                      controller: _handleController,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      maxLength: 30,
+                      textInputAction: TextInputAction.done,
+                      // Lowercase as you type; spaces become hyphens
+                      inputFormatters: [
+                        TextInputFormatter.withFunction(
+                          (_, value) => value.copyWith(
+                            text: value.text.toLowerCase().replaceAll(' ', '-'),
+                          ),
+                        ),
+                        FilteringTextInputFormatter.allow(RegExp('[a-z0-9-]')),
+                      ],
+                      onChanged: (_) => setState(() {
+                        _handleEdited = true;
+                        _handleError = null;
+                      }),
+                      decoration: InputDecoration(
+                        prefixText: '/l/',
+                        hintText: 'book-buddies',
+                        helperText: "For this library's web catalog",
+                        errorText: _handleError,
+                      ),
+                      validator: _validateHandle,
+                    ),
+                  ],
                 ],
               ),
             ),
