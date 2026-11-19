@@ -120,7 +120,7 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
 
     try {
       if (isDelete) {
-        await repository.deleteLibrary(library.id!);
+        await repository.deleteLibrary(library.id!, handle: library.handle);
         messenger.showMessage('Deleted ${library.name}');
       } else {
         await repository.removeMember(library.id!, userId);
@@ -144,11 +144,16 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
     // False for someone looking at a public library they aren't in
     final isMember = live.members.contains(uid);
 
-    // Owner's name, once the member profiles have loaded
     final members =
         ref.watch(libraryMembersProvider(library.id!)).valueOrNull ?? [];
-    final owner = members.where((m) => m.uid == live.ownerId).firstOrNull;
-    final ownerName = isOwner ? 'you' : owner?.name;
+    // Owner and editors by name, once the member profiles have loaded
+    final runBy = [
+      for (final id in live.runBy)
+        if (id == uid)
+          'you'
+        else if (members.where((m) => m.uid == id).firstOrNull case final m?)
+          m.name,
+    ];
 
     final memberCount = live.members.length;
     final textTheme = Theme.of(context).textTheme;
@@ -257,11 +262,22 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                               Text(
                                 '$memberCount ${memberCount == 1 ? 'member' : 'members'}'
                                 ' · ${live.bookCount} ${live.bookCount == 1 ? 'book' : 'books'}'
-                                '${ownerName != null ? ' · Owned by $ownerName' : ''}',
+                                ' · ${live.isPublic ? 'Public' : 'Private'}',
                                 style: textTheme.bodyMedium?.copyWith(
                                   color: AppColors.textSecondary,
                                 ),
                               ),
+                              if (live.description != null) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  live.description!,
+                                  style: textTheme.bodyMedium,
+                                ),
+                              ],
+                              if (runBy.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                _RunByRow(names: runBy),
+                              ],
                               const SizedBox(height: 8),
                               Row(
                                 children: [
@@ -324,6 +340,57 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
 }
 
 enum _LibraryAction { addBook, edit, delete, leave }
+
+// "Run by you, Asha and 2 others": the owner and editors, so visitors
+// know who looks after the library
+class _RunByRow extends StatelessWidget {
+  final List<String> names;
+
+  const _RunByRow({required this.names});
+
+  // Up to two names, then a count of the rest
+  String get _label {
+    if (names.length <= 2) return names.join(' and ');
+    final rest = names.length - 2;
+    return '${names.take(2).join(', ')} and $rest ${rest == 1 ? 'other' : 'others'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        const Icon(
+          Icons.shield_outlined,
+          size: 16,
+          color: AppColors.textSecondary,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text.rich(
+            TextSpan(
+              text: 'Run by ',
+              style: textTheme.bodyMedium?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+              children: [
+                TextSpan(
+                  text: _label,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 // Request to join a public library, or cancel a request that's waiting.
 // Becomes the member view once the owner approves.
