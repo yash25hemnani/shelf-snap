@@ -5,8 +5,10 @@ import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
 import 'package:shelf_snap/core/widgets/user_avatar.dart';
 import 'package:shelf_snap/features/auth/services/auth_service.dart';
+import 'package:shelf_snap/features/library/models/join_request.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
 import 'package:shelf_snap/features/library/providers/library_provider.dart';
+import 'package:shelf_snap/features/library/widgets/join_request_tile.dart';
 import 'package:shelf_snap/features/profile/models/user_model.dart';
 
 enum _MemberAction { toggleEdits, remove }
@@ -76,6 +78,9 @@ class MembersTab extends ConsumerWidget {
     final membersAsync = ref.watch(libraryMembersProvider(library.id!));
     final textTheme = Theme.of(context).textTheme;
     final viewerIsOwner = AuthService().currentUser?.uid == library.ownerId;
+    // Empty for everyone but the owner
+    final requests =
+        ref.watch(joinRequestsProvider(library.id!)).valueOrNull ?? const [];
 
     return membersAsync.when(
       data: (members) {
@@ -85,9 +90,17 @@ class MembersTab extends ConsumerWidget {
 
         return ListView.separated(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: members.length,
-          separatorBuilder: (_, _) => const Divider(height: 1, indent: 72),
+          // The requests section, when there is one, comes first
+          itemCount: members.length + (requests.isEmpty ? 0 : 1),
+          separatorBuilder: (_, index) => requests.isNotEmpty && index == 0
+              ? const SizedBox(height: 8)
+              : const Divider(height: 1, indent: 72),
           itemBuilder: (context, index) {
+            if (requests.isNotEmpty) {
+              if (index == 0) return _RequestsSection(requests: requests);
+              index--;
+            }
+
             final member = members[index];
             final isOwner = member.uid == library.ownerId;
             // The owner is in editors too, but shows as Owner
@@ -185,6 +198,36 @@ class MembersTab extends ConsumerWidget {
       },
       error: (err, stack) => Center(child: Text('Error: $err')),
       loading: () => const Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+// People waiting to join, shown to the owner above the member list
+class _RequestsSection extends StatelessWidget {
+  final List<JoinRequest> requests;
+
+  const _RequestsSection({required this.requests});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            requests.length == 1
+                ? '1 request to join'
+                : '${requests.length} requests to join',
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 8),
+          for (final request in requests) ...[
+            JoinRequestTile(key: ValueKey(request.uid), request: request),
+            if (request != requests.last) const SizedBox(height: 8),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -104,8 +104,10 @@ class HomeScreen extends ConsumerWidget {
     }
 
     final profile = ref.watch(userProfileProvider(uid)).valueOrNull;
-    final inviteCount =
-        ref.watch(incomingInvitesProvider(uid)).valueOrNull?.length ?? 0;
+    // Invites to answer plus requests to join libraries the user owns
+    final notificationCount =
+        (ref.watch(incomingInvitesProvider(uid)).valueOrNull?.length ?? 0) +
+        (ref.watch(ownerJoinRequestsProvider).valueOrNull?.length ?? 0);
     final year = DateTime.now().year;
     final stats =
         ref.watch(readingStatsProvider(year)).valueOrNull ??
@@ -141,10 +143,9 @@ class HomeScreen extends ConsumerWidget {
                   name: profile?.name.split(' ').first,
                   bell: IconButton(
                     tooltip: 'Notifications',
-                    // The badge shows the number of pending invites
                     icon: Badge.count(
-                      count: inviteCount,
-                      isLabelVisible: inviteCount > 0,
+                      count: notificationCount,
+                      isLabelVisible: notificationCount > 0,
                       child: const Icon(Icons.notifications_none_rounded),
                     ),
                     onPressed: () =>

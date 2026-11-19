@@ -92,8 +92,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
 
     final librariesAsync = ref.watch(userLibrariesProvider(userId));
-    final inviteCount =
-        ref.watch(incomingInvitesProvider(userId)).valueOrNull?.length ?? 0;
+    // Invites to answer plus requests to join libraries the user owns
+    final notificationCount =
+        (ref.watch(incomingInvitesProvider(userId)).valueOrNull?.length ?? 0) +
+        (ref.watch(ownerJoinRequestsProvider).valueOrNull?.length ?? 0);
     // Public libraries the user isn't in yet; capped at 20 by the query
     final otherPublic =
         (ref.watch(publicLibrariesProvider).valueOrNull ?? const [])
@@ -110,10 +112,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
           actions: [
             IconButton(
               tooltip: 'Notifications',
-              // The badge shows the number of pending invites
               icon: Badge.count(
-                count: inviteCount,
-                isLabelVisible: inviteCount > 0,
+                count: notificationCount,
+                isLabelVisible: notificationCount > 0,
                 child: const Icon(Icons.notifications_none_rounded),
               ),
               onPressed: () => Navigator.push(
