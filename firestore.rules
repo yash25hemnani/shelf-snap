@@ -130,21 +130,28 @@ service cloud.firestore {
         return /databases/$(database)/documents/invites/$(libId + '_' + u);
       }
 
-      // resource == null: a deleted library reads as missing instead of failing
-      allow read: if signedIn() && (resource == null || isMemberOf(resource.data));
+      // resource == null: a deleted library reads as missing instead of failing.
+      // Member check first: old libraries have no access field. Listing public
+      // libraries works because that query filters on access == 'public'.
+      allow read: if signedIn() && (resource == null
+        || isMemberOf(resource.data)
+        || resource.data.access == 'public');
 
       allow create: if signedIn()
         && request.resource.data.ownerId == uid()
         && request.resource.data.members == [uid()]
         && request.resource.data.editors == [uid()]
         && request.resource.data.bookCount == 0
-        && request.resource.data.uniqueCount == 0;
+        && request.resource.data.uniqueCount == 0
+        && request.resource.data.get('access', 'private') in ['private', 'public'];
 
       allow update: if signedIn() && (
-        // Owner: anything except ownership, and can't drop themselves
+        // Owner: anything except ownership, and can't drop themselves.
+        // Only the owner can switch access; editors only touch counts.
         (uid() == resource.data.ownerId
           && request.resource.data.ownerId == resource.data.ownerId
-          && uid() in request.resource.data.members)
+          && uid() in request.resource.data.members
+          && request.resource.data.get('access', 'private') in ['private', 'public'])
 
         // Editors: only the counts, when adding or removing books
         || (isEditorOf(resource.data)
@@ -169,11 +176,14 @@ service cloud.firestore {
       allow delete: if signedIn() && uid() == resource.data.ownerId;
 
       match /books/{bookId} {
-        // Viewers only see public books, so their queries must filter on
-        // visibility. Every book has the field (seed_visibility.js).
+        // Viewers, and anyone looking at a public library, only see public
+        // books, so their queries must filter on visibility. Every book has
+        // the field (seed_visibility.js).
         allow read: if signedIn() && (
           isEditorOf(libraryData(libId))
           || (isMemberOf(libraryData(libId))
+              && resource.data.visibility == 'public')
+          || (libraryData(libId).get('access', 'private') == 'public'
               && resource.data.visibility == 'public'));
 
         // Copies on loan can never be more than the copies owned
