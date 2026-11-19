@@ -9,4 +9,7 @@ class ApiConfig {
       defaultValue: 'http://localhost:3000',
     );
   }
+
+  // Public web catalog of a public library, served by the wrapper
+  static String catalogUrl(String handle) => '$baseUrl/l/$handle';
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/config/api_config.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/features/library/models/library_model.dart';
@@ -307,7 +308,9 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
                       decoration: InputDecoration(
                         prefixText: '/l/',
                         hintText: 'book-buddies',
-                        helperText: "For this library's web catalog",
+                        // Full address so owners know where it'll live
+                        helperText:
+                            "Web catalog at ${ApiConfig.baseUrl.replaceFirst(RegExp(r'^https?://'), '')}/l/…",
                         errorText: _handleError,
                       ),
                       validator: _validateHandle,

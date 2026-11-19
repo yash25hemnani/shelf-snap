@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shelf_snap/core/config/api_config.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 import 'package:shelf_snap/core/utils/snackbar.dart';
 import 'package:shelf_snap/core/widgets/confirm_dialog.dart';
@@ -278,6 +280,12 @@ class _LibraryDetailScreenState extends ConsumerState<LibraryDetailScreen> {
                                 const SizedBox(height: 8),
                                 _RunByRow(names: runBy),
                               ],
+                              if (live.isPublic && live.handle != null) ...[
+                                const SizedBox(height: 4),
+                                _WebAddressRow(
+                                  url: ApiConfig.catalogUrl(live.handle!),
+                                ),
+                              ],
                               const SizedBox(height: 8),
                               Row(
                                 children: [
@@ -388,6 +396,61 @@ class _RunByRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// The library's web catalog address; tap to copy it and share it anywhere
+class _WebAddressRow extends StatelessWidget {
+  final String url;
+
+  const _WebAddressRow({required this.url});
+
+  Future<void> _copy(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await Clipboard.setData(ClipboardData(text: url));
+    messenger.showMessage('Web address copied');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    // Drop the scheme; it's still in what gets copied
+    final shown = url.replaceFirst(RegExp(r'^https?://'), '');
+
+    return InkWell(
+      onTap: () => _copy(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.public_rounded,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                shown,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.copy_rounded,
+              size: 16,
+              color: AppColors.textSecondary,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
