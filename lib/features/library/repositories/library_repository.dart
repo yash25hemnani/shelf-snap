@@ -21,8 +21,25 @@ class LibraryRepository {
       'name': library.name,
       'description': library.description,
       'banner': library.banner,
+      'access': library.access.name,
       'updatedAt': Timestamp.now(),
     });
+  }
+
+  // Most recently active public libraries. Capped, since anyone can list
+  // them; the access filter is also what lets the rules allow the query.
+  Stream<List<LibraryModel>> watchPublicLibraries({int limit = 20}) {
+    return _db
+        .collection('libraries')
+        .where('access', isEqualTo: LibraryAccess.public.name)
+        .orderBy('updatedAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => LibraryModel.fromMap(doc.id, doc.data()))
+              .toList(),
+        );
   }
 
   // Stream and watch all libraries for a user
@@ -314,11 +331,7 @@ class LibraryRepository {
 
   // Adding books merges copies by ISBN, so two books in one library can't
   // share one. Two results at most: one of them may be this same book.
-  Future<void> updateIsbn(
-    String libraryId,
-    String bookId,
-    String? isbn,
-  ) async {
+  Future<void> updateIsbn(String libraryId, String bookId, String? isbn) async {
     final books = _db
         .collection('libraries')
         .doc(libraryId)

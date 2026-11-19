@@ -28,6 +28,11 @@ final userLibrariesProvider = StreamProvider.family<List<LibraryModel>, String>(
       ref.watch(libraryRepositoryProvider).watchUserLibraries(userId),
 );
 
+// Public libraries anyone can find, newest activity first, up to 20
+final publicLibrariesProvider = StreamProvider.autoDispose<List<LibraryModel>>(
+  (ref) => ref.watch(libraryRepositoryProvider).watchPublicLibraries(),
+);
+
 // Libraries the user can add books to: ones they own or edit.
 // Viewers can't save books there, so pickers don't list them.
 final editableLibrariesProvider =

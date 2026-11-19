@@ -6,7 +6,14 @@ import 'package:shelf_snap/features/library/models/library_model.dart';
 class CreateLibraryScreen extends StatelessWidget {
   final String userId;
   final LibraryModel? library;
-  const CreateLibraryScreen({super.key, required this.userId, this.library});
+  // Starting choice for a new library, from the tab it was opened on
+  final LibraryAccess initialAccess;
+  const CreateLibraryScreen({
+    super.key,
+    required this.userId,
+    this.library,
+    this.initialAccess = LibraryAccess.private,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +26,11 @@ class CreateLibraryScreen extends StatelessWidget {
         title: Text(library == null ? 'Create Library' : 'Edit Library'),
       ),
       body: SafeArea(
-        child: CreateLibraryForm(userId: userId, library: library),
+        child: CreateLibraryForm(
+          userId: userId,
+          library: library,
+          initialAccess: initialAccess,
+        ),
       ),
     );
   }

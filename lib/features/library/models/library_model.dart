@@ -2,6 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/painting.dart';
 import 'package:shelf_snap/core/theme/app_colors.dart';
 
+// Public libraries can be found and opened by anyone signed in; outsiders
+// only see their public books. Not called visibility, books have that.
+enum LibraryAccess { private, public }
+
 class LibraryModel {
   final String? id;
   final String name;
@@ -13,6 +17,7 @@ class LibraryModel {
   final List<String> members;
   final List<String> editors; // can edit copies; always inside members
   final String banner; // key in AppColors.libraryBanners
+  final LibraryAccess access;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -27,6 +32,7 @@ class LibraryModel {
     this.members = const [],
     this.editors = const [],
     this.banner = AppColors.defaultBanner,
+    this.access = LibraryAccess.private,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -41,6 +47,7 @@ class LibraryModel {
     'members': members,
     'editors': editors,
     'banner': banner,
+    'access': access.name,
     'createdAt': Timestamp.fromDate(createdAt),
     'updatedAt': Timestamp.fromDate(updatedAt),
   };
@@ -61,10 +68,16 @@ class LibraryModel {
       banner: AppColors.libraryBanners.containsKey(map['banner'])
           ? map['banner'] as String
           : AppColors.defaultBanner,
+      // Libraries made before access existed stay private
+      access:
+          LibraryAccess.values.asNameMap()[map['access']] ??
+          LibraryAccess.private,
       createdAt: (map['createdAt'] as Timestamp).toDate(),
       updatedAt: (map['updatedAt'] as Timestamp).toDate(),
     );
   }
+
+  bool get isPublic => access == LibraryAccess.public;
 
   ImageProvider get bannerImage =>
       AssetImage(AppColors.libraryBanners[banner]!);

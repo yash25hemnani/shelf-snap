@@ -8,7 +8,13 @@ import 'package:shelf_snap/features/library/providers/library_provider.dart';
 class CreateLibraryForm extends ConsumerStatefulWidget {
   final String userId;
   final LibraryModel? library; // set = editing this library
-  const CreateLibraryForm({super.key, required this.userId, this.library});
+  final LibraryAccess initialAccess; // used for new libraries only
+  const CreateLibraryForm({
+    super.key,
+    required this.userId,
+    this.library,
+    this.initialAccess = LibraryAccess.private,
+  });
 
   @override
   ConsumerState<CreateLibraryForm> createState() => _CreateLibraryFormState();
@@ -25,12 +31,15 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
 
   String _banner = AppColors.defaultBanner; // key in AppColors.libraryBanners
 
+  late LibraryAccess _access;
+
   bool get _isEditing => widget.library != null;
 
   @override
   void initState() {
     super.initState();
     final library = widget.library;
+    _access = library?.access ?? widget.initialAccess;
 
     if (library != null) {
       _nameController.text = library.name;
@@ -50,6 +59,8 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final repository = ref.read(libraryRepositoryProvider);
+    // Captured before the await, so the snackbar works after it
+    final messenger = ScaffoldMessenger.of(context);
 
     final name = _nameController.text.trim();
     final desc = _descController.text.trim();
@@ -60,6 +71,7 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
       description: desc.isEmpty ? null : desc,
       ownerId: widget.userId,
       banner: _banner,
+      access: _access,
       createdAt: now,
       updatedAt: now,
     );
@@ -75,6 +87,7 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
             description: desc.isEmpty ? null : desc,
             ownerId: widget.library!.ownerId,
             banner: _banner,
+            access: _access,
             createdAt: widget.library!.createdAt,
             updatedAt: DateTime.now(),
           ),
@@ -87,9 +100,10 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
       if (!mounted) return;
       Navigator.pop(context);
     } catch (e) {
+      debugPrint('Save library failed: $e');
       if (!mounted) return;
       setState(() => _isSaving = false);
-      ScaffoldMessenger.of(context).showError("Couldn't save library");
+      messenger.showError("Couldn't save library");
     }
   }
 
@@ -181,6 +195,35 @@ class _CreateLibraryFormState extends ConsumerState<CreateLibraryForm> {
                     decoration: const InputDecoration(
                       hintText: 'A shared space for book lovers…',
                       alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  const _FieldLabel('Who can find it'),
+                  SegmentedButton<LibraryAccess>(
+                    segments: const [
+                      ButtonSegment(
+                        value: LibraryAccess.private,
+                        label: Text('Private'),
+                        icon: Icon(Icons.lock_outline_rounded),
+                      ),
+                      ButtonSegment(
+                        value: LibraryAccess.public,
+                        label: Text('Public'),
+                        icon: Icon(Icons.public_rounded),
+                      ),
+                    ],
+                    selected: {_access},
+                    onSelectionChanged: (selection) =>
+                        setState(() => _access = selection.first),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _access == LibraryAccess.public
+                        ? 'Anyone can find this library and see its public books'
+                        : 'Only people you invite can see it',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.textSecondary,
                     ),
                   ),
                 ],
